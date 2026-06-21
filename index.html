@@ -391,9 +391,15 @@ const TF = (() => {
       : '<div class="tf-empty">Belum ada setoran tercatat.</div>';
   }
 
-  // Menyatukan info lokasi setoran: surah+ayat untuk level Qur'an/3 jenis setoran, halaman untuk Penilaian Metode Ummi.
+  // Menyatukan info lokasi setoran: surah+ayat (bisa lintas 2 surah) untuk 3 jenis setoran,
+  // halaman untuk Penilaian Metode Ummi.
   function formatLokasiSetoran(r) {
-    if (r.surah) return `${r.surah} : ${r.ayat_mulai}-${r.ayat_selesai}`;
+    if (r.surah) {
+      const beda = r.surah_selesai && r.surah_selesai !== r.surah;
+      return beda
+        ? `${r.surah} : ${r.ayat_mulai} — ${r.surah_selesai} : ${r.ayat_selesai}`
+        : `${r.surah} : ${r.ayat_mulai}-${r.ayat_selesai}`;
+    }
     if (r.halaman_mulai || r.halaman_selesai) return `Hal. ${r.halaman_mulai}-${r.halaman_selesai}`;
     return '-';
   }
@@ -461,13 +467,28 @@ const TF = (() => {
   }
 
   function onSurahChange(selectEl) {
-    const idx = selectEl.id.replace('m-surah-', '');
+    const id = selectEl.id;
     const opt = selectEl.options[selectEl.selectedIndex];
     const jumlahAyat = Number(opt.dataset.jumlahAyat || 0);
-    const mulaiEl = document.getElementById('m-ayat-mulai-' + idx);
-    const selesaiEl = document.getElementById('m-ayat-selesai-' + idx);
-    if (mulaiEl) mulaiEl.innerHTML = ayatOptionsHtml(jumlahAyat);
-    if (selesaiEl) selesaiEl.innerHTML = ayatOptionsHtml(jumlahAyat);
+    const surahValue = opt.value;
+
+    if (id.indexOf('m-surah-mulai-') === 0) {
+      const idx = id.replace('m-surah-mulai-', '');
+      const ayatEl = document.getElementById('m-ayat-mulai-' + idx);
+      if (ayatEl) ayatEl.innerHTML = ayatOptionsHtml(jumlahAyat);
+      // Surah Akhir otomatis mengikuti Surah Awal (kasus umum 1 surah); penyimak bisa
+      // mengubahnya manual kalau siswa setor lebih dari satu surah dalam pertemuan ini.
+      const surahSelesaiEl = document.getElementById('m-surah-selesai-' + idx);
+      if (surahSelesaiEl) {
+        surahSelesaiEl.value = surahValue;
+        const ayatSelesaiEl = document.getElementById('m-ayat-selesai-' + idx);
+        if (ayatSelesaiEl) ayatSelesaiEl.innerHTML = ayatOptionsHtml(jumlahAyat);
+      }
+    } else if (id.indexOf('m-surah-selesai-') === 0) {
+      const idx = id.replace('m-surah-selesai-', '');
+      const ayatEl = document.getElementById('m-ayat-selesai-' + idx);
+      if (ayatEl) ayatEl.innerHTML = ayatOptionsHtml(jumlahAyat);
+    }
   }
 
   // Maksimal halaman buku Jilid Ummi 1-6 (cukup untuk seluruh buku, disamakan untuk semua jilid).
@@ -478,17 +499,22 @@ const TF = (() => {
     return opts;
   }
 
-  // Blok untuk 3 jenis setoran (Hafalan Baru / Murojaah / Tilawah) — selalu memakai
-  // pilihan Surah + Ayat Awal/Akhir sesuai suratnya, berlaku untuk semua level termasuk Jilid Ummi 1-6.
+  // Blok untuk 3 jenis setoran (Hafalan Baru / Murojaah / Tilawah) — memakai Surah Awal & Surah Akhir
+  // (beserta ayat masing-masing) supaya bisa mencatat setoran yang mencakup lebih dari satu surah
+  // dalam satu pertemuan. Berlaku untuk semua level termasuk Jilid Ummi 1-6.
   function jenisBlockHtml(jenis, idx) {
     return `
       <div class="tf-jenis-block" style="border:1px solid #e3e9e4;border-radius:10px;padding:12px;margin-bottom:10px;background:#fafdfb;">
         <p style="font-weight:600;color:var(--green-dark);margin:0 0 8px;">${jenis}</p>
-        <div class="tf-field"><label>Surah</label>${surahSelectHtml('m-surah-' + idx)}</div>
         <div class="tf-grid2">
+          <div class="tf-field"><label>Surah Awal</label>${surahSelectHtml('m-surah-mulai-' + idx)}</div>
           <div class="tf-field"><label>Ayat Awal</label><select id="m-ayat-mulai-${idx}"><option value="">-</option></select></div>
+        </div>
+        <div class="tf-grid2">
+          <div class="tf-field"><label>Surah Akhir</label>${surahSelectHtml('m-surah-selesai-' + idx)}</div>
           <div class="tf-field"><label>Ayat Akhir</label><select id="m-ayat-selesai-${idx}"><option value="">-</option></select></div>
         </div>
+        <div class="tf-empty" style="margin:-2px 0 8px;font-size:11.5px;">Surah Akhir otomatis mengikuti Surah Awal — ubah jika siswa setor lebih dari satu surah dalam pertemuan ini.</div>
         <div class="tf-field"><label>Nilai (0-100)</label><input id="m-nilai-${idx}" type="number" min="0" max="100"></div>
       </div>
     `;
@@ -600,18 +626,19 @@ const TF = (() => {
       });
     }
 
-    // b. 3 jenis setoran (Surah + Ayat Awal/Akhir).
+    // b. 3 jenis setoran (Surah Awal/Akhir + Ayat Awal/Akhir).
     const jenisList = Array.from(document.querySelectorAll('.m-jenis-toggle:checked')).map(c => c.value);
     for (let i = 0; i < jenisList.length; i++) {
       const nilai = val('m-nilai-' + i);
-      const surah = val('m-surah-' + i);
+      const surahMulai = val('m-surah-mulai-' + i);
       const ayatMulai = val('m-ayat-mulai-' + i);
+      const surahSelesai = val('m-surah-selesai-' + i) || surahMulai;
       const ayatSelesai = val('m-ayat-selesai-' + i);
-      if (!surah || !ayatMulai || !ayatSelesai || !nilai) {
-        alert('Untuk jenis "' + jenisList[i] + '", surah, ayat awal, ayat akhir, dan nilai wajib diisi.');
+      if (!surahMulai || !ayatMulai || !surahSelesai || !ayatSelesai || !nilai) {
+        alert('Untuk jenis "' + jenisList[i] + '", surah awal, ayat awal, surah akhir, ayat akhir, dan nilai wajib diisi.');
         return;
       }
-      items.push({ santri_id: santriId, tanggal, jenis: jenisList[i], surah, ayat_mulai: ayatMulai, ayat_selesai: ayatSelesai, nilai, catatan });
+      items.push({ santri_id: santriId, tanggal, jenis: jenisList[i], surah: surahMulai, surah_selesai: surahSelesai, ayat_mulai: ayatMulai, ayat_selesai: ayatSelesai, nilai, catatan });
     }
 
     if (!items.length) {
@@ -867,6 +894,45 @@ const TF = (() => {
       </div>
       <h3 style="color:var(--green-dark);font-size:15px;">Grafik Setoran per Hari</h3>
       <div class="tf-bar-chart">${bars || '<div class="tf-empty">Tidak ada data pada rentang ini.</div>'}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:18px;">
+        <h3 style="color:var(--green-dark);font-size:15px;margin:0;">🏆 Peringkat Capaian Siswa</h3>
+        <select id="st-sort-peringkat" onchange="TF.renderPeringkat()">
+          <option value="rata_nilai">Urutkan: Rata-rata Nilai Tertinggi</option>
+          <option value="total_setoran">Urutkan: Total Setoran Terbanyak</option>
+        </select>
+      </div>
+      <div id="tf-peringkat-result"></div>
+    `;
+    state.cache.statPeringkat = res.peringkat || [];
+    renderPeringkat();
+  }
+
+  // Peringkat siswa pada periode/filter statistik yang sedang ditampilkan, bisa diurutkan
+  // berdasarkan kategori capaian tertinggi (rata-rata nilai atau total setoran).
+  function renderPeringkat() {
+    const el = document.getElementById('tf-peringkat-result');
+    if (!el) return;
+    const sortSel = document.getElementById('st-sort-peringkat');
+    const sortBy = sortSel ? sortSel.value : 'rata_nilai';
+    const data = (state.cache.statPeringkat || []).slice().sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0));
+    if (!data.length) { el.innerHTML = '<div class="tf-empty">Tidak ada data siswa pada filter ini.</div>'; return; }
+    const medals = ['🥇', '🥈', '🥉'];
+    const rows = data.map((d, i) => `
+      <tr>
+        <td style="text-align:center;font-weight:700;">${medals[i] || (i + 1)}</td>
+        <td>${escapeHtml(d.nama)}</td>
+        <td>${escapeHtml(d.kelas_nama)}</td>
+        <td>${escapeHtml(d.level_ummi)}</td>
+        <td style="text-align:center;${sortBy === 'total_setoran' ? 'font-weight:700;' : ''}">${d.total_setoran}</td>
+        <td style="text-align:center;${sortBy === 'rata_nilai' ? 'font-weight:700;' : ''}">${d.rata_nilai}</td>
+      </tr>`).join('');
+    el.innerHTML = `
+      <div class="tf-table-wrap">
+        <table class="tf-table">
+          <thead><tr><th>#</th><th>Nama</th><th>Kelas</th><th>Level Ummi</th><th>Total Setoran</th><th>Rata-rata Nilai</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
     `;
   }
 
@@ -918,7 +984,7 @@ const TF = (() => {
     const namaBulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][bulan - 1];
     const rows = d.detail.map(r => `<tr>
       <td>${formatTanggalWaktu(r.tanggal)}</td><td>${escapeHtml(r.jenis)}</td>
-      <td>${escapeHtml(r.surah)} (${escapeHtml(r.ayat_mulai)}-${escapeHtml(r.ayat_selesai)})${r.halaman_mulai || r.halaman_selesai ? ' Hal. ' + escapeHtml(r.halaman_mulai) + '-' + escapeHtml(r.halaman_selesai) : ''}</td>
+      <td>${escapeHtml(formatLokasiSetoran(r))}</td>
       <td>${escapeHtml(r.nilai)}</td><td>${escapeHtml(r.predikat)}</td>
       <td>${escapeHtml(r.nilai_tajwid)}</td><td>${escapeHtml(r.nilai_fashohah)}</td><td>${escapeHtml(r.nilai_kelancaran)}</td>
     </tr>`).join('');
@@ -1194,7 +1260,7 @@ const TF = (() => {
     onUmmiGradeChange, toggleUmmiBlock,
     openSantriModal, submitSantri, downloadTemplateSiswa, uploadSiswa,
     openKelasModal, submitKelas,
-    toggleStatFilter, loadStatistik,
+    toggleStatFilter, loadStatistik, renderPeringkat,
     loadRekap, cetakRapor, exportRekapExcel,
     mushafPrev, mushafNext, mushafGoto, mushafGotoSurah,
     openUserModal, submitUser, openBinaanModal, filterBinaanList, submitBinaan,
