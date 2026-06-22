@@ -212,11 +212,21 @@
   .rp-footer { position:absolute; bottom:14px; left:40px; right:40px; font-size:8.5px; color:#888; text-align:center; border-top:1px solid #ddd; padding-top:5px; }
 
   @media print {
+    @page { margin: 0; size: A4 portrait; }
     body * { visibility:hidden; }
     .tf-rapor-print, .tf-rapor-print * { visibility:visible; }
-    .tf-rapor-print { position:absolute; top:0; left:0; width:210mm; }
-    .tf-rapor-a4 { width:210mm; min-height:297mm; padding:8mm 16mm 16mm; margin:0 auto; }
+    .tf-rapor-print { position:fixed; top:0; left:0; width:100%; height:100%; }
+    .tf-rapor-a4 { width:210mm; min-height:297mm; padding:10mm 18mm 14mm; margin:0 auto; box-sizing:border-box; }
     .rp-table th, .rp-table td { font-size:10px; padding:2px 4px; }
+    .rp-kop { padding-bottom:7px; margin-bottom:2px; }
+    .rp-judul { margin:10px 0 9px; }
+    .rp-info-box { padding:8px 14px; margin-bottom:10px; }
+    .rp-cards { margin-bottom:10px; }
+    .rp-ummi-box { padding:8px 12px; margin-bottom:10px; }
+    .rp-sec { margin:3px 0 6px; }
+    .rp-catatan { margin-bottom:10px; }
+    .rp-ttd { margin-top:18px; }
+    .rp-ttd-space { height:38px; }
   }
 </style>
 </head>
@@ -1138,15 +1148,21 @@ const TF = (() => {
     }
 
     // ── Tabel ringkasan per jenis ──
+    // Tajwid/fashohah/kelancaran: gunakan nilai spesifik jika ada, fallback ke rata-rata nilai jenis tersebut
     const badgeCls = {'Setoran Metode Ummi':'b-ummi','Hafalan Baru':'b-haf','Murojaah':'b-mur','Tilawah':'b-til'};
     const tabelRows = jenisAll.filter(j=>byJ[j].length).map(j=>{
       const rows=byJ[j], isUmmi=j==='Setoran Metode Ummi', av=avgN(rows);
+      const aTajwid    = avgF(rows,'nilai_tajwid');
+      const aFashohah  = avgF(rows,'nilai_fashohah');
+      const aKelancaran= avgF(rows,'nilai_kelancaran');
+      // Jika sub-nilai tidak diisi (0), gunakan rata-rata nilai sebagai estimasi
+      const showT = isUmmi ? '—' : (aTajwid    || av);
+      const showF = isUmmi ? '—' : (aFashohah  || av);
+      const showK = isUmmi ? '—' : (aKelancaran|| av);
       return `<tr>
         <td><span class="badge ${badgeCls[j]}">${j}</span></td>
         <td>${rows.length}</td><td>${av}</td><td>${predUmum(av)}</td>
-        <td>${isUmmi?'—':avgF(rows,'nilai_tajwid')}</td>
-        <td>${isUmmi?'—':avgF(rows,'nilai_fashohah')}</td>
-        <td>${isUmmi?'—':avgF(rows,'nilai_kelancaran')}</td>
+        <td>${showT}</td><td>${showF}</td><td>${showK}</td>
       </tr>`;
     }).join('');
 
