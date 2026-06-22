@@ -148,18 +148,72 @@
   .tf-ayah-num{color:var(--green);font-size:17px;margin:0 4px;}
   .tf-mushaf-note{font-size:12px;color:#6c8aa0;margin-top:10px;}
 
-  /* rapor cetak */
-  .tf-rapor-a4{background:#fff;}
-  .tf-rapor-header{text-align:center;margin-bottom:14px;}
-  .tf-rapor-header h2{margin:0;color:var(--green-dark);font-size:18px;}
-  .tf-rapor-info td{padding:3px 6px;font-size:13.5px;}
-  .tf-rapor-table{margin-top:10px;}
-  .tf-rapor-signature{display:flex;justify-content:space-between;margin-top:50px;text-align:center;font-size:13px;}
-  @media print{
-    body *{visibility:hidden;}
-    .tf-rapor-print, .tf-rapor-print *{visibility:visible;}
-    .tf-rapor-print{position:absolute;top:0;left:0;width:210mm;}
-    .tf-rapor-a4{width:210mm;min-height:297mm;padding:18mm;margin:0 auto;}
+  /* ==================== RAPOR CETAK ==================== */
+  .tf-rapor-a4 { background:#fff; font-family: 'Times New Roman', Times, serif; color:#000; }
+
+  /* KOP SURAT */
+  .rp-kop {
+    display: flex; align-items: center; gap: 14px;
+    padding-bottom: 8px;
+    border-bottom: 4px solid #000;
+    margin-bottom: 4px;
+  }
+  .rp-kop-logo {
+    width: 72px; height: 72px; flex-shrink: 0;
+    border-radius: 50%; border: 1px solid #ccc;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px; color: #555; text-align: center; overflow: hidden;
+  }
+  .rp-kop-logo img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+  .rp-kop-teks { flex: 1; text-align: center; }
+  .rp-kop-teks .t1 { font-size: 13px; font-weight: normal; margin: 0; color: #000; }
+  .rp-kop-teks .t2 { font-size: 17px; font-weight: bold; margin: 2px 0; color: #000; text-transform: uppercase; }
+  .rp-kop-teks .t3 { font-size: 10.5px; color: #000; margin: 0; line-height: 1.5; }
+  .rp-kop-teks .t3 a { color: #000; text-decoration: underline; }
+
+  /* JUDUL RAPOR */
+  .rp-judul { text-align: center; margin: 12px 0 10px; }
+  .rp-judul h2 { font-size: 15px; font-weight: bold; text-transform: uppercase;
+    text-decoration: underline; margin: 0 0 2px; color: #000; letter-spacing: 1px; }
+  .rp-judul p { font-size: 12px; margin: 0; color: #000; }
+
+  /* INFO SISWA */
+  .rp-info { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+  .rp-info td { font-size: 12px; padding: 1.5px 4px; color: #000; vertical-align: top; }
+  .rp-info td:first-child { width: 110px; }
+  .rp-info td:nth-child(2) { width: 10px; }
+
+  /* TABEL SETORAN */
+  .rp-table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 11px; color: #000; }
+  .rp-table th { border: 1px solid #000; padding: 4px 5px; background: #fff;
+    font-weight: bold; text-align: center; color: #000; font-size: 11px; }
+  .rp-table td { border: 1px solid #000; padding: 3px 5px; color: #000; }
+  .rp-table td.center { text-align: center; }
+
+  /* RINGKASAN */
+  .rp-summary { margin: 8px 0 4px; font-size: 12px; color: #000; }
+
+  /* TANDA TANGAN — layout sama dengan format sekolah:
+     kiri: OrangTua/Wali | tengah: Mengetahui/KepSek | kanan: Tanggal/Penyimak */
+  .rp-ttd {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-top: 32px; font-size: 12px; color: #000;
+  }
+  .rp-ttd-col { display: flex; flex-direction: column; }
+  .rp-ttd-col.left  { min-width: 140px; }
+  .rp-ttd-col.center { text-align: center; flex: 1; align-items: center; margin-top: 52px; }
+  .rp-ttd-col.right { min-width: 180px; text-align: center; }
+  .rp-ttd-space { height: 52px; }
+  .rp-ttd-name { font-weight: bold; text-decoration: underline; margin-top: 4px; }
+  .rp-ttd-dots { margin-top: 4px; }
+
+  @media print {
+    body * { visibility: hidden; }
+    .tf-rapor-print, .tf-rapor-print * { visibility: visible; }
+    .tf-rapor-print { position: absolute; top: 0; left: 0; width: 210mm; }
+    .tf-rapor-a4 { width: 210mm; min-height: 297mm; padding: 15mm 18mm 18mm; margin: 0 auto; }
+    .rp-table { font-size: 10px; }
+    .rp-table th, .rp-table td { padding: 2px 4px; }
   }
 </style>
 </head>
@@ -943,18 +997,36 @@ const TF = (() => {
     const kelasOptions = '<option value="">Semua Kelas</option>' + state.cache.kelas.map(k => `<option value="${k.id}">${escapeHtml(k.nama_kelas)}</option>`).join('');
     const now = new Date();
     content.innerHTML = `
-      <h1 class="tf-title">Rekap &amp; Rapor Bulanan</h1>
+      <h1 class="tf-title">Rekap &amp; Rapor</h1>
       <div class="tf-panel"><div class="tf-panel-body">
-        <div class="tf-stat-filter">
-          <select id="rk-bulan">${monthOptions(now.getMonth() + 1)}</select>
-          <input id="rk-tahun" type="number" value="${now.getFullYear()}" style="width:90px">
+        <div class="tf-stat-filter" style="flex-wrap:wrap;gap:8px;">
+          <select id="rk-mode" onchange="TF.toggleRekapMode()">
+            <option value="bulanan">Bulanan</option>
+            <option value="semester">Semester</option>
+          </select>
+          <span id="rk-bulanan-wrap">
+            <select id="rk-bulan">${monthOptions(now.getMonth() + 1)}</select>
+          </span>
+          <span id="rk-semester-wrap" style="display:none;">
+            <select id="rk-semester">
+              <option value="1">Semester 1 (Jul–Des)</option>
+              <option value="2">Semester 2 (Jan–Jun)</option>
+            </select>
+          </span>
+          <input id="rk-tahun" type="number" value="${now.getFullYear()}" style="width:80px">
           <select id="rk-kelas">${kelasOptions}</select>
           <button class="tf-btn-sm" onclick="TF.loadRekap()">Tampilkan</button>
-          <button class="tf-add-btn" onclick="TF.exportRekapExcel()">⬇ Export ke Excel</button>
+          <button class="tf-add-btn" onclick="TF.exportRekapExcel()">⬇ Export Excel</button>
         </div>
-        <div id="tf-rekap-result"><div class="tf-empty">Pilih bulan/tahun lalu klik Tampilkan.</div></div>
+        <div id="tf-rekap-result"><div class="tf-empty">Pilih periode lalu klik Tampilkan.</div></div>
       </div></div>
     `;
+  }
+
+  function toggleRekapMode() {
+    const mode = val('rk-mode');
+    document.getElementById('rk-bulanan-wrap').style.display = mode === 'bulanan' ? '' : 'none';
+    document.getElementById('rk-semester-wrap').style.display = mode === 'semester' ? '' : 'none';
   }
 
   function monthOptions(selected) {
@@ -963,50 +1035,177 @@ const TF = (() => {
   }
 
   async function loadRekap() {
-    const payload = { bulan: val('rk-bulan'), tahun: val('rk-tahun'), kelas_id: val('rk-kelas') };
+    const mode = val('rk-mode');
+    const tahun = val('rk-tahun');
+    const kelas_id = val('rk-kelas');
+    let payload;
+    if (mode === 'semester') {
+      const sem = val('rk-semester');
+      payload = sem === '1'
+        ? { bulan_mulai: 7, bulan_akhir: 12, tahun, kelas_id }
+        : { bulan_mulai: 1, bulan_akhir: 6, tahun, kelas_id };
+    } else {
+      payload = { bulan: val('rk-bulan'), bulan_mulai: val('rk-bulan'), bulan_akhir: val('rk-bulan'), tahun, kelas_id };
+    }
     const res = await call('getRekap', payload);
     state.cache.rekap = res.ok ? res.data : [];
+    state.cache.rekapMeta = { mode, tahun, bulan: payload.bulan, bulan_mulai: payload.bulan_mulai, bulan_akhir: payload.bulan_akhir };
     const el = document.getElementById('tf-rekap-result');
     if (!res.ok) { el.innerHTML = '<p class="tf-error">' + res.error + '</p>'; return; }
     el.innerHTML = res.data.length ? `<div class="tf-table-wrap"><table class="tf-table"><thead><tr>
-        <th>Nama</th><th>NIS</th><th>Kelas</th><th>Level Ummi</th><th>Total Setoran</th><th>Rata Nilai</th><th>Aksi</th>
+        <th>Nama</th><th>NIS</th><th>Kelas</th><th>Level Ummi</th><th>Penyimak</th><th>Total Setoran</th><th>Rata Nilai</th><th>Aksi</th>
       </tr></thead><tbody>${res.data.map(d => `<tr>
         <td>${escapeHtml(d.nama)}</td><td>${escapeHtml(d.nis)}</td><td>${escapeHtml(d.kelas_nama)}</td>
-        <td>${escapeHtml(d.level_ummi)}</td><td>${d.total_setoran}</td><td>${d.rata_nilai}</td>
-        <td><button class="tf-btn-sm" onclick="TF.cetakRapor('${d.santri_id}')">Cetak Rapor</button></td>
+        <td>${escapeHtml(d.level_ummi)}</td><td>${escapeHtml(d.penyimak_nama || '-')}</td>
+        <td>${d.total_setoran}</td><td>${d.rata_nilai}</td>
+        <td><button class="tf-btn-sm" onclick="TF.cetakRapor('${d.santri_id}')">🖨 Cetak Rapor</button></td>
       </tr>`).join('')}</tbody></table></div>` : '<div class="tf-empty">Tidak ada data pada periode ini.</div>';
   }
 
   function cetakRapor(santriId) {
     const d = (state.cache.rekap || []).find(x => String(x.santri_id) === String(santriId));
     if (!d) return;
-    const bulan = val('rk-bulan'); const tahun = val('rk-tahun');
-    const namaBulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][bulan - 1];
-    const rows = d.detail.map(r => `<tr>
-      <td>${formatTanggalWaktu(r.tanggal)}</td><td>${escapeHtml(r.jenis)}</td>
-      <td>${escapeHtml(formatLokasiSetoran(r))}</td>
-      <td>${escapeHtml(r.nilai)}</td><td>${escapeHtml(r.predikat)}</td>
-      <td>${escapeHtml(r.nilai_tajwid)}</td><td>${escapeHtml(r.nilai_fashohah)}</td><td>${escapeHtml(r.nilai_kelancaran)}</td>
-    </tr>`).join('');
+
+    const meta = state.cache.rekapMeta || {};
+    const BULAN_NAMA = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+    // Label periode untuk judul dan tanda tangan
+    let periodeLabel = '';
+    if (meta.mode === 'semester') {
+      const semNum = Number(meta.bulan_mulai) >= 7 ? 1 : 2;
+      const bMulaiNama = BULAN_NAMA[Number(meta.bulan_mulai) - 1];
+      const bAkhirNama = BULAN_NAMA[Number(meta.bulan_akhir) - 1];
+      periodeLabel = `Semester ${semNum} (${bMulaiNama} – ${bAkhirNama} ${meta.tahun})`;
+    } else {
+      periodeLabel = `Bulan ${BULAN_NAMA[Number(meta.bulan) - 1]} ${meta.tahun}`;
+    }
+
+    // Tanggal cetak hari ini dalam format "Blora, DD Bulan YYYY"
+    const today = new Date();
+    const tglCetak = `Blora, ${today.getDate()} ${BULAN_NAMA[today.getMonth()]} ${today.getFullYear()}`;
+
+    // Nama penyimak
+    const penyimakNama = d.penyimak_nama || '..............................';
+
+    // Baris detail setoran
+    const rows = d.detail.map((r, i) => `
+      <tr>
+        <td class="center">${i + 1}</td>
+        <td class="center">${formatTanggalWaktu(r.tanggal)}</td>
+        <td>${escapeHtml(r.jenis)}</td>
+        <td>${escapeHtml(formatLokasiSetoran(r))}</td>
+        <td class="center">${escapeHtml(String(r.nilai))}</td>
+        <td class="center">${escapeHtml(r.predikat)}</td>
+        <td class="center">${escapeHtml(String(r.nilai_tajwid || ''))}</td>
+        <td class="center">${escapeHtml(String(r.nilai_fashohah || ''))}</td>
+        <td class="center">${escapeHtml(String(r.nilai_kelancaran || ''))}</td>
+        <td>${escapeHtml(r.catatan || '')}</td>
+      </tr>`).join('');
 
     document.getElementById('tf-rapor-print').innerHTML = `
       <div class="tf-rapor-a4">
-        <div class="tf-rapor-header"><h2>RAPOR TAHFIZ — SMP ISLAM MOETIAH</h2><p>Bulan ${namaBulan} ${tahun}</p></div>
-        <table class="tf-rapor-info">
-          <tr><td>Nama</td><td>: ${escapeHtml(d.nama)}</td><td>NIS</td><td>: ${escapeHtml(d.nis)}</td></tr>
-          <tr><td>Kelas</td><td>: ${escapeHtml(d.kelas_nama)}</td><td>Level Ummi</td><td>: ${escapeHtml(d.level_ummi)}</td></tr>
-        </table>
-        <table class="tf-table tf-rapor-table"><thead><tr>
-          <th>Tgl</th><th>Jenis</th><th>Surah/Ayat</th><th>Nilai</th><th>Predikat</th><th>Tajwid</th><th>Fashohah</th><th>Kelancaran</th>
-        </tr></thead><tbody>${rows}</tbody></table>
-        <p><b>Rata-rata Nilai: ${d.rata_nilai}</b> &nbsp;|&nbsp; Total Setoran: ${d.total_setoran}</p>
-        <div class="tf-rapor-signature">
-          <div>Orang Tua/Wali<br><br><br>(...........................)</div>
-          <div>Penyimak<br><br><br>(...........................)</div>
-          <div>Kepala Sekolah<br><br><br>(...........................)</div>
+
+        <!-- KOP SURAT -->
+        <div class="rp-kop">
+          <div class="rp-kop-logo">
+            <img src="https://yayasanmoetiah.org/favicon.ico" onerror="this.style.display='none';this.parentNode.innerHTML='LOGO';" alt="Logo">
+          </div>
+          <div class="rp-kop-teks">
+            <p class="t1">YAYASAN ENCIK MOETIAH MOELJONO</p>
+            <p class="t2">SEKOLAH MENENGAH PERTAMA ISLAM MOETIAH</p>
+            <p class="t3">Alamat: Jl. Gunung Lawu Lorong I Nomor 20 Sawahan, Kelurahan Tempelan, Kecamatan Blora<br>
+              Kabupaten Blora, Provinsi Jawa Tengah, Kode Pos: 58211, Email:
+              <a href="mailto:smpIslammoetiah@gmail.com">smpIslammoetiah@gmail.com</a>
+              Website: <a href="https://yayasanmoetiah.org">yayasanmoetiah.org</a>
+              Telephone: 0851 2103 8591
+            </p>
+          </div>
         </div>
+
+        <!-- JUDUL -->
+        <div class="rp-judul">
+          <h2>Rapor Tahfiz Al-Qur'an Metode Ummi</h2>
+          <p>${periodeLabel}</p>
+        </div>
+
+        <!-- INFO SISWA -->
+        <table class="rp-info">
+          <tr>
+            <td>Nama Siswa</td><td>:</td>
+            <td style="font-weight:bold;">${escapeHtml(d.nama)}</td>
+            <td style="width:20px;"></td>
+            <td>Kelas</td><td>:</td>
+            <td>${escapeHtml(d.kelas_nama)}</td>
+          </tr>
+          <tr>
+            <td>NIS</td><td>:</td>
+            <td>${escapeHtml(d.nis)}</td>
+            <td></td>
+            <td>Level / Jilid Ummi</td><td>:</td>
+            <td>${escapeHtml(d.level_ummi)}</td>
+          </tr>
+          <tr>
+            <td>Penyimak</td><td>:</td>
+            <td colspan="5">${escapeHtml(penyimakNama)}</td>
+          </tr>
+        </table>
+
+        <!-- TABEL SETORAN -->
+        <table class="rp-table">
+          <thead>
+            <tr>
+              <th style="width:24px;">No</th>
+              <th>Tanggal</th>
+              <th>Jenis Setoran</th>
+              <th>Surah / Halaman</th>
+              <th>Nilai</th>
+              <th>Predikat</th>
+              <th>Tajwid</th>
+              <th>Fashohah</th>
+              <th>Kelancaran</th>
+              <th>Catatan</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="10" style="text-align:center;">Tidak ada data setoran pada periode ini.</td></tr>'}
+          </tbody>
+        </table>
+
+        <!-- RINGKASAN -->
+        <p class="rp-summary">
+          <b>Rata-rata Nilai: ${d.rata_nilai}</b>
+          &nbsp;&nbsp;|&nbsp;&nbsp;Total Setoran: ${d.total_setoran}
+        </p>
+
+        <!-- TANDA TANGAN -->
+        <div class="rp-ttd">
+          <!-- KIRI: Orang Tua/Wali -->
+          <div class="rp-ttd-col left">
+            <span>Orang Tua/Wali</span>
+            <div class="rp-ttd-space"></div>
+            <span class="rp-ttd-dots">.................................</span>
+          </div>
+
+          <!-- TENGAH: Mengetahui / Kepala Sekolah -->
+          <div class="rp-ttd-col center">
+            <span>Mengetahui,</span>
+            <span>Kepala Sekolah</span>
+            <div class="rp-ttd-space"></div>
+            <span class="rp-ttd-name">Ramdhan Machmoed, S.S., M.Pd.</span>
+          </div>
+
+          <!-- KANAN: Tanggal & Penyimak -->
+          <div class="rp-ttd-col right">
+            <span>${tglCetak}</span>
+            <span>Penyimak,</span>
+            <div class="rp-ttd-space"></div>
+            <span class="rp-ttd-name">${escapeHtml(penyimakNama)}</span>
+          </div>
+        </div>
+
       </div>
     `;
+
     document.getElementById('tf-rapor-print').classList.remove('tf-hide');
     window.print();
     document.getElementById('tf-rapor-print').classList.add('tf-hide');
@@ -1261,7 +1460,7 @@ const TF = (() => {
     openSantriModal, submitSantri, downloadTemplateSiswa, uploadSiswa,
     openKelasModal, submitKelas,
     toggleStatFilter, loadStatistik, renderPeringkat,
-    loadRekap, cetakRapor, exportRekapExcel,
+    loadRekap, cetakRapor, exportRekapExcel, toggleRekapMode,
     mushafPrev, mushafNext, mushafGoto, mushafGotoSurah,
     openUserModal, submitUser, openBinaanModal, filterBinaanList, submitBinaan,
     closeModal
