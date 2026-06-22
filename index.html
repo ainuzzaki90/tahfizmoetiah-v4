@@ -215,7 +215,7 @@
     body * { visibility:hidden; }
     .tf-rapor-print, .tf-rapor-print * { visibility:visible; }
     .tf-rapor-print { position:absolute; top:0; left:0; width:210mm; }
-    .tf-rapor-a4 { width:210mm; min-height:297mm; padding:15mm 18mm 20mm; margin:0 auto; }
+    .tf-rapor-a4 { width:210mm; min-height:297mm; padding:8mm 16mm 16mm; margin:0 auto; }
     .rp-table th, .rp-table td { font-size:10px; padding:2px 4px; }
   }
 </style>
@@ -1161,9 +1161,58 @@ const TF = (() => {
       </div>`;
     }).join('');
 
-    // ── Catatan guru ──
-    const catatanArr = d.detail.map(r=>r.catatan).filter(c=>c&&c.trim());
-    const catatanText = catatanArr.length ? escapeHtml(catatanArr[catatanArr.length-1]) : '<i>—</i>';
+    // ── Catatan deskriptif otomatis berdasarkan capaian siswa ──
+    function generateCatatan(d, byJ, hariHadir, periodeLabel) {
+      const nama = d.nama.split(' ')[0]; // Panggil dengan nama depan
+      const avg = d.rata_nilai;
+      const total = d.total_setoran;
+
+      // Predikat keseluruhan
+      const predMap = avg >= 90 ? ['sangat baik','Jayyid Jiddan','mempertahankan dan terus meningkatkan kualitas bacaan']
+        : avg >= 80 ? ['baik','Jayyid','terus berlatih agar mencapai predikat Jayyid Jiddan']
+        : avg >= 70 ? ['cukup','Maqbul','meningkatkan intensitas latihan dan memperbanyak murojaah']
+        : ['perlu perhatian','Dhoif','meningkatkan frekuensi setoran dan bimbingan intensif'];
+
+      // Keaktifan
+      const aktifKet = hariHadir >= 20 ? 'sangat aktif mengikuti kegiatan setoran'
+        : hariHadir >= 15 ? 'cukup aktif mengikuti kegiatan setoran'
+        : hariHadir >= 8  ? 'hadir cukup, namun perlu ditingkatkan keaktifannya'
+        : 'perlu ditingkatkan kehadirannya dalam kegiatan setoran';
+
+      // Kalimat per jenis
+      const kalimatJenis = [];
+      const haf = byJ['Hafalan Baru'], mur = byJ['Murojaah'], til = byJ['Tilawah'];
+      if (haf.length) {
+        const av = avgN(haf);
+        kalimatJenis.push(`hafalan baru ${av>=85?'menunjukkan hasil yang memuaskan':'masih perlu ditingkatkan'} dengan rata-rata nilai ${av}`);
+      }
+      if (mur.length) {
+        const av = avgN(mur);
+        kalimatJenis.push(`murojaah berjalan ${av>=85?'dengan baik dan lancar':'cukup lancar namun perlu penguatan'} (rata-rata ${av})`);
+      }
+      if (til.length) {
+        const av = avgN(til);
+        kalimatJenis.push(`tilawah ${av>=85?'sudah baik':'perlu diperbaiki'} dengan rata-rata nilai ${av}`);
+      }
+
+      // Kalimat Ummi
+      let ummiKet = '';
+      const ummiRows = byJ['Setoran Metode Ummi'];
+      if (ummiRows.length) {
+        const hh = ummiRows.map(r=>[Number(r.halaman_mulai)||0,Number(r.halaman_selesai)||0]).filter(h=>h[0]||h[1]);
+        const halAwal  = hh.length ? Math.min(...hh.map(h=>h[0])) : null;
+        const halAkhir = hh.length ? Math.max(...hh.map(h=>h[1])) : null;
+        const avU = avgN(ummiRows);
+        const naik = halAwal && halAkhir && halAkhir > halAwal;
+        ummiKet = `Pada penilaian Metode Ummi, Ananda ${naik?`berhasil menyelesaikan halaman ${halAwal} hingga ${halAkhir}`:`telah mengikuti penilaian Metode Ummi`} dengan rata-rata nilai ${avU} (${avU>=85?'sangat baik':avU>=75?'baik':'perlu penguatan'}). `;
+      }
+
+      const jenisKet = kalimatJenis.length ? `Untuk jenis setoran lainnya: ${kalimatJenis.join('; ')}. ` : '';
+
+      return `Ananda ${nama} ${aktifKet} pada ${periodeLabel} dengan total ${total} setoran dan rata-rata nilai ${avg} (predikat: ${predMap[1]}). ${ummiKet}${jenisKet}Secara keseluruhan perkembangan Ananda ${predMap[0]}, dan diharapkan untuk ${predMap[2]}.`;
+    }
+
+    const catatanText = generateCatatan(d, byJ, hariHadir, periodeLabel);
 
     document.getElementById('tf-rapor-print').innerHTML = `
       <div class="tf-rapor-a4">
@@ -1221,7 +1270,7 @@ const TF = (() => {
         <div style="margin-bottom:13px;">${bars}</div>
 
         <div class="rp-sec">Catatan Guru Pengampu</div>
-        <div class="rp-catatan">${catatanText}</div>
+        <div class="rp-catatan" style="font-style:normal;">${escapeHtml(catatanText)}</div>
 
         <div class="rp-ttd">
           <div class="rp-ttd-col left">
