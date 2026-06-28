@@ -1,12 +1,10 @@
-:root{
+  :root{
     --green-dark:#0c4a6e; --green:#0284c7; --green-light:#38bdf8;
     --cyan:#06b6d4; --red:#d23a4f; --gold:#e8a33d; --cream:#eef6fb; --ink:#0f2a3d;
     --card-radius:14px;
   }
   *{box-sizing:border-box;}
-  html, body{margin:0;padding:0;height:100%;background:var(--cream);font-family:'Segoe UI',Tahoma,sans-serif;color:var(--ink);overflow:hidden;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cg fill='none' stroke='rgba(12,74,110,0.05)' stroke-width='1.2'%3E%3Cpath d='M40 4 L52 28 L76 40 L52 52 L40 76 L28 52 L4 40 L28 28 Z'/%3E%3Ccircle cx='40' cy='40' r='14'/%3E%3C/g%3E%3C/svg%3E");
-    background-repeat:repeat;background-size:80px 80px;}
+  html, body{margin:0;padding:0;height:100%;background:var(--cream);font-family:'Segoe UI',Tahoma,sans-serif;color:var(--ink);overflow:hidden;}
   #tahfiz-app{position:fixed;inset:0;width:100%;height:100%;display:flex;flex-direction:column;}
   .tf-hide{display:none !important;}
 
@@ -23,33 +21,24 @@
   .tf-user span{display:none;}
   @media(min-width:640px){ .tf-user span{display:inline;} }
 
-  /* ===== SIDEBAR (drawer di mobile, persistent di desktop) ===== */
+  /* ===== SIDEBAR (drawer) ===== */
   .tf-main-wrapper{flex:1;position:relative;display:flex;overflow:hidden;}
   .tf-sidebar-overlay{position:fixed;inset:0;background:rgba(8,30,45,.45);opacity:0;visibility:hidden;
     transition:opacity .2s;z-index:1500;}
   .tf-sidebar-overlay.tf-open{opacity:1;visibility:visible;}
   .tf-sidebar{position:fixed;top:0;left:0;height:100%;width:260px;
     background:linear-gradient(180deg,var(--green-dark),var(--green));color:#fff;z-index:1600;
-    transform:translateX(-100%);transition:transform .25s ease,width .25s ease;display:flex;flex-direction:column;
+    transform:translateX(-100%);transition:transform .25s ease;display:flex;flex-direction:column;
     box-shadow:4px 0 24px rgba(0,0,0,.25);}
   .tf-sidebar.tf-open{transform:translateX(0);}
   @media(max-width:480px){ .tf-sidebar{width:82vw;max-width:300px;} }
-  /* Desktop/tablet: sidebar selalu terlihat (persistent), ikut alur flex, bisa ditutup/dilebarkan lagi */
-  @media(min-width:768px){
-    .tf-sidebar-overlay{display:none;}
-    .tf-sidebar{position:relative;transform:none;flex-shrink:0;box-shadow:none;
-      border-right:1px solid rgba(0,0,0,.08);overflow:hidden;}
-    .tf-sidebar.tf-collapsed{width:0;border-right:none;}
-    .tf-sidebar.tf-collapsed .tf-sidebar-header,
-    .tf-sidebar.tf-collapsed .tf-menu{opacity:0;}
-  }
   .tf-sidebar-header{display:flex;align-items:center;justify-content:space-between;padding:18px 16px;
-    border-bottom:1px solid rgba(255,255,255,.15);flex-shrink:0;white-space:nowrap;}
+    border-bottom:1px solid rgba(255,255,255,.15);flex-shrink:0;}
   .tf-sidebar-header .tf-brand{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;}
   .tf-sidebar-close{background:rgba(255,255,255,.15);border:none;color:#fff;width:30px;height:30px;
     border-radius:6px;cursor:pointer;font-size:14px;flex-shrink:0;}
   .tf-sidebar-close:hover{background:rgba(255,255,255,.3);}
-  .tf-menu{display:flex;flex-direction:column;padding:10px;gap:4px;overflow-y:auto;flex:1;white-space:nowrap;}
+  .tf-menu{display:flex;flex-direction:column;padding:10px;gap:4px;overflow-y:auto;flex:1;}
   .tf-menu button{background:transparent;border:none;color:#fff;padding:11px 14px;border-radius:8px;
     cursor:pointer;font-size:14px;text-align:left;transition:.15s;}
   .tf-menu button:hover{background:rgba(255,255,255,.15);}
@@ -146,10 +135,6 @@
     font-family:'Amiri Quran','Amiri',serif;direction:rtl;text-align:justify;font-size:25px;line-height:2.5;min-height:300px;}
   .tf-surah-head{text-align:center;font-size:21px;font-weight:700;color:var(--green-dark);
     border:2px solid var(--green);border-radius:8px;padding:8px;margin:14px 0;background:#f3f8f4;}
-  .tf-basmalah{display:block;text-align:center;font-size:24px;color:var(--gold);font-weight:600;
-    margin:6px 0 4px;}
-  .tf-basmalah-divider{width:160px;height:0;border-top:2px dotted var(--gold);margin:2px auto 16px;
-    opacity:.7;}
   .tf-ayah-num{color:var(--green);font-size:17px;margin:0 4px;}
   .tf-mushaf-note{font-size:12px;color:#6c8aa0;margin-top:10px;}
 
