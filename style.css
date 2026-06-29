@@ -21,28 +21,109 @@
   .tf-user span{display:none;}
   @media(min-width:640px){ .tf-user span{display:inline;} }
 
-  /* ===== SIDEBAR (drawer) ===== */
-  .tf-main-wrapper{flex:1;position:relative;display:flex;overflow:hidden;}
-  .tf-sidebar-overlay{position:fixed;inset:0;background:rgba(8,30,45,.45);opacity:0;visibility:hidden;
-    transition:opacity .2s;z-index:1500;}
-  .tf-sidebar-overlay.tf-open{opacity:1;visibility:visible;}
-  .tf-sidebar{position:fixed;top:0;left:0;height:100%;width:260px;
-    background:linear-gradient(180deg,var(--green-dark),var(--green));color:#fff;z-index:1600;
-    transform:translateX(-100%);transition:transform .25s ease;display:flex;flex-direction:column;
-    box-shadow:4px 0 24px rgba(0,0,0,.25);}
-  .tf-sidebar.tf-open{transform:translateX(0);}
-  @media(max-width:480px){ .tf-sidebar{width:82vw;max-width:300px;} }
-  .tf-sidebar-header{display:flex;align-items:center;justify-content:space-between;padding:18px 16px;
-    border-bottom:1px solid rgba(255,255,255,.15);flex-shrink:0;}
-  .tf-sidebar-header .tf-brand{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;}
-  .tf-sidebar-close{background:rgba(255,255,255,.15);border:none;color:#fff;width:30px;height:30px;
-    border-radius:6px;cursor:pointer;font-size:14px;flex-shrink:0;}
-  .tf-sidebar-close:hover{background:rgba(255,255,255,.3);}
-  .tf-menu{display:flex;flex-direction:column;padding:10px;gap:4px;overflow-y:auto;flex:1;}
-  .tf-menu button{background:transparent;border:none;color:#fff;padding:11px 14px;border-radius:8px;
-    cursor:pointer;font-size:14px;text-align:left;transition:.15s;}
-  .tf-menu button:hover{background:rgba(255,255,255,.15);}
-  .tf-menu button.active{background:#fff;color:var(--green-dark);font-weight:600;}
+ /* ===== ORNAMEN ISLAMI ===== */
+
+body::before{
+content:"";
+position:fixed;
+inset:0;
+
+background:
+url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cg opacity='0.14'%3E%3Cpath d='M80 10L100 80L80 150L60 80Z' fill='%230284c7'/%3E%3C/g%3E%3C/svg%3E");
+
+opacity:.05;
+pointer-events:none;
+z-index:0;
+}
+
+#tahfiz-app{
+position:fixed;
+z-index:1;
+}
+
+
+/* ===== SIDEBAR DESKTOP + MOBILE ===== */
+
+.tf-main-wrapper{
+display:flex;
+flex:1;
+overflow:hidden;
+}
+
+.tf-sidebar{
+width:260px;
+flex-shrink:0;
+background:linear-gradient(
+180deg,
+var(--green-dark),
+var(--green)
+);
+
+display:flex;
+flex-direction:column;
+
+transition:.3s;
+overflow:hidden;
+}
+
+.tf-sidebar.tf-collapsed{
+width:80px;
+}
+
+.tf-sidebar.tf-collapsed .tf-brand span,
+.tf-sidebar.tf-collapsed .tf-menu button{
+font-size:0;
+}
+
+.tf-sidebar.tf-collapsed .tf-menu button{
+padding:14px;
+text-align:center;
+}
+
+.tf-sidebar-overlay{
+display:none;
+}
+
+@media(max-width:768px){
+
+.tf-sidebar{
+
+position:fixed;
+left:-100%;
+top:0;
+height:100%;
+z-index:2000;
+width:260px;
+}
+
+.tf-sidebar.tf-open{
+left:0;
+}
+
+.tf-sidebar.tf-collapsed{
+width:260px;
+}
+
+.tf-sidebar-overlay{
+display:block;
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.4);
+
+opacity:0;
+visibility:hidden;
+
+transition:.3s;
+z-index:1900;
+}
+
+.tf-sidebar-overlay.tf-open{
+
+opacity:1;
+visibility:visible;
+}
+
+}
 
   /* ===== FOOTER ===== */
   .tf-footer{flex-shrink:0;text-align:center;font-size:12px;color:#557;padding:10px 14px;
