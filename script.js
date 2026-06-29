@@ -48,7 +48,7 @@ const UMMI_GRADE_TABLE = [
 const LEVEL_JILID_UMMI = ['Jilid 1', 'Jilid 2', 'Jilid 3', 'Jilid 4', 'Jilid 5', 'Jilid 6'];
 
 const TF = (() => {
-  let state = { token: null, user: null, view: 'dashboard', cache: {}, mushafPage: 1 };
+  let state = { token: null, user: null, view: 'dashboard', cache: {}, mushafPage: 1, basmalahText: null };
 
   async function call(action, payload = {}) {
     const res = await fetch(API_URL, {
@@ -101,26 +101,48 @@ const TF = (() => {
     return all.filter(m => m.roles.includes(role));
   }
 
-  function setView(v) { state.view = v; closeSidebar(); render(); }
+  function setView(v) { state.view = v; closeSidebarOnNavigate(); render(); }
+  function isDesktopLayout() {
+    return window.matchMedia('(min-width: 768px)').matches;
+  }
+  // Dipanggil setiap pindah menu: di mobile drawer otomatis tertutup,
+  // di desktop sidebar tetap terbuka terus (persistent) sampai user menutupnya sendiri.
+  function closeSidebarOnNavigate() {
+    if (!isDesktopLayout()) {
+      document.getElementById('tf-sidebar').classList.remove('tf-open');
+      document.getElementById('tf-sidebar-overlay').classList.remove('tf-open');
+    }
+  }
   function toggleSidebar() {
-    document.getElementById('tf-sidebar').classList.toggle('tf-open');
-    document.getElementById('tf-sidebar-overlay').classList.toggle('tf-open');
+    if (isDesktopLayout()) {
+      document.getElementById('tf-sidebar').classList.toggle('tf-collapsed');
+    } else {
+      document.getElementById('tf-sidebar').classList.toggle('tf-open');
+      document.getElementById('tf-sidebar-overlay').classList.toggle('tf-open');
+    }
   }
   function closeSidebar() {
-    document.getElementById('tf-sidebar').classList.remove('tf-open');
-    document.getElementById('tf-sidebar-overlay').classList.remove('tf-open');
+    if (isDesktopLayout()) {
+      document.getElementById('tf-sidebar').classList.add('tf-collapsed');
+    } else {
+      document.getElementById('tf-sidebar').classList.remove('tf-open');
+      document.getElementById('tf-sidebar-overlay').classList.remove('tf-open');
+    }
   }
 
   async function render() {
     const loginView = document.getElementById('tf-login-view');
     const topbar = document.getElementById('tf-topbar');
     const content = document.getElementById('tf-content');
+    const sidebar = document.getElementById('tf-sidebar');
 
     if (!state.token || !state.user) {
       loginView.classList.remove('tf-hide'); topbar.classList.add('tf-hide'); content.classList.add('tf-hide');
+      sidebar.classList.add('tf-hide');
       return;
     }
     loginView.classList.add('tf-hide'); topbar.classList.remove('tf-hide'); content.classList.remove('tf-hide');
+    sidebar.classList.remove('tf-hide');
 
     document.getElementById('tf-username-label').textContent = state.user.nama + ' (' + state.user.role + ')';
     const menuEl = document.getElementById('tf-menu');
@@ -1076,11 +1098,26 @@ const TF = (() => {
     await loadMushafPage(state.mushafPage);
   }
 
+  // Ambil teks basmalah "murni" dari ayat global no.1 (Al-Fatihah ayat 1, yang HANYA berisi basmalah,
+  // tidak menyambung ayat lain). Dipakai sebagai acuan untuk memisah basmalah dari ayat pertama surah lain.
+  async function getBasmalahText() {
+    if (state.basmalahText) return state.basmalahText;
+    try {
+      const res = await fetch('https://api.alquran.cloud/v1/ayah/1/quran-uthmani');
+      const json = await res.json();
+      if (json.code === 200 && json.data && json.data.text) {
+        state.basmalahText = json.data.text.trim();
+      }
+    } catch (e) { /* abaikan, fallback tanpa pemisahan */ }
+    return state.basmalahText;
+  }
+
   async function loadMushafPage(page) {
     state.mushafPage = page;
     const el = document.getElementById('tf-mushaf-page');
     el.innerHTML = 'Memuat halaman ' + page + '...';
     try {
+      const basmalahText = await getBasmalahText();
       const res = await fetch(`https://api.alquran.cloud/v1/page/${page}/quran-uthmani`);
       const json = await res.json();
       if (json.code !== 200) { el.innerHTML = 'Gagal memuat halaman.'; return; }
@@ -1089,7 +1126,15 @@ const TF = (() => {
       let lastSurah = null;
       ayahs.forEach(a => {
         if (a.surah.number !== lastSurah) { html += `<div class="tf-surah-head">سورة ${a.surah.name}</div>`; lastSurah = a.surah.number; }
-        html += `<span class="tf-ayah">${a.text}<span class="tf-ayah-num">﴿${toArabicNumber(a.numberInSurah)}﴾</span></span> `;
+        let ayahText = a.text;
+        // Surah selain Al-Fatihah (1) dan At-Taubah (9, tanpa basmalah) menyimpan basmalah
+        // menyatu di awal teks ayat pertama. Pisahkan jadi baris sendiri dengan pembatas.
+        if (a.numberInSurah === 1 && a.surah.number !== 1 && a.surah.number !== 9
+            && basmalahText && ayahText.indexOf(basmalahText) === 0) {
+          html += `<div class="tf-basmalah">${basmalahText}</div><div class="tf-basmalah-divider"></div>`;
+          ayahText = ayahText.slice(basmalahText.length).trim();
+        }
+        html += `<span class="tf-ayah">${ayahText}<span class="tf-ayah-num">﴿${toArabicNumber(a.numberInSurah)}﴾</span></span> `;
       });
       el.innerHTML = html;
       const inputEl = document.getElementById('tf-mushaf-page-input');
