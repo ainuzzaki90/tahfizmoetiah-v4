@@ -102,39 +102,14 @@ const TF = (() => {
   }
 
   function setView(v) { state.view = v; closeSidebar(); render(); }
-  function toggleSidebar(){
-
-if(window.innerWidth<=768){
-
-document.getElementById('tf-sidebar')
-.classList.toggle('tf-open');
-
-document.getElementById('tf-sidebar-overlay')
-.classList.toggle('tf-open');
-
-}
-else{
-
-document.getElementById('tf-sidebar')
-.classList.toggle('tf-collapsed');
-
-}
-
-}
-
-function closeSidebar(){
-
-if(window.innerWidth<=768){
-
-document.getElementById('tf-sidebar')
-.classList.remove('tf-open');
-
-document.getElementById('tf-sidebar-overlay')
-.classList.remove('tf-open');
-
-}
-
-}
+  function toggleSidebar() {
+    document.getElementById('tf-sidebar').classList.toggle('tf-open');
+    document.getElementById('tf-sidebar-overlay').classList.toggle('tf-open');
+  }
+  function closeSidebar() {
+    document.getElementById('tf-sidebar').classList.remove('tf-open');
+    document.getElementById('tf-sidebar-overlay').classList.remove('tf-open');
+  }
 
   async function render() {
     const loginView = document.getElementById('tf-login-view');
@@ -1112,58 +1087,10 @@ document.getElementById('tf-sidebar-overlay')
       const ayahs = json.data.ayahs;
       let html = '';
       let lastSurah = null;
-      ayahs.forEach(a=>{
-
-if(a.surah.number!==lastSurah){
-
-html+=`
-<div class="tf-surah-divider">
-
-<div class="tf-surah-head">
-سورة ${a.surah.name}
-</div>
-
-${
-a.surah.number!==9
-?
-`<div class="tf-basmalah">
-﷽
-</div>`
-:
-''
-}
-
-</div>
-`;
-
-lastSurah=a.surah.number;
-}
-
-let ayat=a.text;
-
-if(
-a.numberInSurah===1 &&
-a.surah.number!==1 &&
-a.surah.number!==9
-){
-
-ayat=ayat.replace(
-'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
-''
-);
-
-}
-
-html+=`
-<span class="tf-ayah">
-${ayat}
-<span class="tf-ayah-num">
-﴿${toArabicNumber(a.numberInSurah)}﴾
-</span>
-</span>
-`;
-
-});
+      ayahs.forEach(a => {
+        if (a.surah.number !== lastSurah) { html += `<div class="tf-surah-head">سورة ${a.surah.name}</div>`; lastSurah = a.surah.number; }
+        html += `<span class="tf-ayah">${a.text}<span class="tf-ayah-num">﴿${toArabicNumber(a.numberInSurah)}﴾</span></span> `;
+      });
       el.innerHTML = html;
       const inputEl = document.getElementById('tf-mushaf-page-input');
       if (inputEl) inputEl.value = page;
