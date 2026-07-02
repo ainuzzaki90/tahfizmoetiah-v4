@@ -467,6 +467,7 @@ const TF = (() => {
     const dataWithKelasNama = santriRes.data.map(s => Object.assign({}, s, {
       kelas_nama: kelasMapNama[s.kelas_id] || '(belum ada kelas)'
     }));
+    state.cache.santriList = dataWithKelasNama;
     content.innerHTML = `
       <h1 class="tf-title">Data Siswa</h1>
       <div class="tf-panel">
@@ -491,7 +492,7 @@ const TF = (() => {
             <td>${escapeHtml(s.level_ummi||'-')}</td>
             <td>${escapeHtml(s.jenis_kelamin||'-')}</td>
             <td style="white-space:nowrap;">
-              <button class="tf-btn-icon" title="Edit" onclick="TF.openEditSantriModal(${JSON.stringify(s)})">✏️</button>
+              <button class="tf-btn-icon" title="Edit" onclick="TF.openEditSantriModal('${s.id}')">✏️</button>
               <button class="tf-btn-icon tf-btn-icon-del" title="Hapus" onclick="TF.deleteSantri('${s.id}','${escapeHtml(s.nama)}')">🗑</button>
             </td>
           </tr>`).join('')}
@@ -504,7 +505,9 @@ const TF = (() => {
 
   const LEVEL_UMMI_OPTIONS = ['Jilid 1','Jilid 2','Jilid 3','Jilid 4','Jilid 5','Jilid 6','Gharib/Tajwid',"Al-Qur'an"];
 
-  function openEditSantriModal(s) {
+  function openEditSantriModal(id) {
+    const s = (state.cache.santriList || []).find(x => String(x.id) === String(id));
+    if (!s) return;
     const kelasOptions = (state.cache.kelas || []).map(k =>
       `<option value="${k.id}" ${String(k.id)===String(s.kelas_id)?'selected':''}>${escapeHtml(k.nama_kelas)}</option>`).join('');
     const levelOptions = LEVEL_UMMI_OPTIONS.map(l =>
@@ -649,6 +652,7 @@ const TF = (() => {
     const dataWithNama = res.data.map(k => Object.assign({}, k, {
       penyimak_nama: k.penyimak_id ? (userMap[k.penyimak_id] || '(tidak ditemukan)') : '-'
     }));
+    state.cache.kelasList = dataWithNama;
     content.innerHTML = `
       <h1 class="tf-title">Data Kelas</h1>
       <div class="tf-panel">
@@ -669,7 +673,7 @@ const TF = (() => {
             <td>${escapeHtml(k.nama_kelas)}</td>
             <td>${escapeHtml(k.penyimak_nama)}</td>
             <td style="white-space:nowrap;">
-              <button class="tf-btn-icon" title="Edit" onclick="TF.openEditKelasModal(${JSON.stringify(k)})">✏️</button>
+              <button class="tf-btn-icon" title="Edit" onclick="TF.openEditKelasModal('${k.id}')">✏️</button>
               <button class="tf-btn-icon tf-btn-icon-del" title="Hapus" onclick="TF.deleteKelas('${k.id}','${escapeHtml(k.nama_kelas)}')">🗑</button>
             </td>
           </tr>`).join('')}
@@ -680,7 +684,9 @@ const TF = (() => {
     `;
   }
 
-  function openEditKelasModal(k) {
+  function openEditKelasModal(id) {
+    const k = (state.cache.kelasList || []).find(x => String(x.id) === String(id));
+    if (!k) return;
     const penyimakOptions = (state.cache.penyimakList || [])
       .map(u => `<option value="${u.id}" ${String(u.id)===String(k.penyimak_id)?'selected':''}>${escapeHtml(u.nama)}</option>`).join('');
     openModal(`
@@ -1283,7 +1289,7 @@ const TF = (() => {
         <td>${escapeHtml(u.nama)}</td>
         <td>${roleBadge}</td>
         <td style="white-space:nowrap;">
-          <button class="tf-btn-icon" title="Edit" onclick="TF.openEditUserModal(${JSON.stringify(u)})">✏️</button>
+          <button class="tf-btn-icon" title="Edit" onclick="TF.openEditUserModal('${u.id}')">✏️</button>
           <button class="tf-btn-icon" title="Ganti Password" onclick="TF.openChangePasswordModal('${u.id}','${escapeHtml(u.nama)}')">🔑</button>
           <button class="tf-btn-icon tf-btn-icon-del" title="Hapus" onclick="TF.deleteUser('${u.id}','${escapeHtml(u.nama)}')">🗑</button>
           ${aksiBinaan}
@@ -1307,7 +1313,9 @@ const TF = (() => {
     `;
   }
 
-  function openEditUserModal(u) {
+  function openEditUserModal(id) {
+    const u = (state.cache.users || []).find(x => String(x.id) === String(id));
+    if (!u) return;
     const kelasOptions = (state.cache.kelas || []).map(k =>
       `<option value="${k.id}" ${String(k.id)===String(u.kelas_id)?'selected':''}>${escapeHtml(k.nama_kelas)}</option>`).join('');
     openModal(`
