@@ -480,16 +480,70 @@ const TF = (() => {
           </div>
         </div>
         <div class="tf-panel-body tf-table-wrap">
-          ${dataWithKelasNama.length ? listToTable(dataWithKelasNama, [
-            ['nama','Nama'],['nis','NIS'],['kelas_nama','Kelas'],['level_ummi','Level Ummi'],
-            ['jenis_kelamin','Jenis Kelamin']
-          ]) : '<div class="tf-empty">Belum ada data siswa.</div>'}
+          ${dataWithKelasNama.length ? `
+          <table class="tf-table"><thead><tr>
+            <th>Nama</th><th>NIS</th><th>Kelas</th><th>Level Ummi</th><th>Jenis Kelamin</th><th>Aksi</th>
+          </tr></thead><tbody>
+          ${dataWithKelasNama.map(s => `<tr>
+            <td>${escapeHtml(s.nama)}</td>
+            <td>${escapeHtml(s.nis||'-')}</td>
+            <td>${escapeHtml(s.kelas_nama)}</td>
+            <td>${escapeHtml(s.level_ummi||'-')}</td>
+            <td>${escapeHtml(s.jenis_kelamin||'-')}</td>
+            <td style="white-space:nowrap;">
+              <button class="tf-btn-icon" title="Edit" onclick="TF.openEditSantriModal(${JSON.stringify(s)})">✏️</button>
+              <button class="tf-btn-icon tf-btn-icon-del" title="Hapus" onclick="TF.deleteSantri('${s.id}','${escapeHtml(s.nama)}')">🗑</button>
+            </td>
+          </tr>`).join('')}
+          </tbody></table>
+          ` : '<div class="tf-empty">Belum ada data siswa.</div>'}
         </div>
       </div>
     `;
   }
 
   const LEVEL_UMMI_OPTIONS = ['Jilid 1','Jilid 2','Jilid 3','Jilid 4','Jilid 5','Jilid 6','Gharib/Tajwid',"Al-Qur'an"];
+
+  function openEditSantriModal(s) {
+    const kelasOptions = (state.cache.kelas || []).map(k =>
+      `<option value="${k.id}" ${String(k.id)===String(s.kelas_id)?'selected':''}>${escapeHtml(k.nama_kelas)}</option>`).join('');
+    const levelOptions = LEVEL_UMMI_OPTIONS.map(l =>
+      `<option ${l===s.level_ummi?'selected':''}>${l}</option>`).join('');
+    openModal(`
+      <h3>Edit Siswa</h3>
+      <div class="tf-field"><label>Nama</label><input id="m-nama" type="text" value="${escapeHtml(s.nama||'')}"></div>
+      <div class="tf-grid2">
+        <div class="tf-field"><label>NIS</label><input id="m-nis" type="text" value="${escapeHtml(s.nis||'')}"></div>
+        <div class="tf-field"><label>Kelas</label><select id="m-kelas">${kelasOptions}</select></div>
+      </div>
+      <div class="tf-field"><label>Jenis Kelamin</label>
+        <select id="m-jk">
+          <option ${s.jenis_kelamin==='Laki-laki'?'selected':''}>Laki-laki</option>
+          <option ${s.jenis_kelamin==='Perempuan'?'selected':''}>Perempuan</option>
+        </select>
+      </div>
+      <div class="tf-field"><label>Level/Jilid Ummi</label><select id="m-level-ummi">${levelOptions}</select></div>
+      <div class="tf-modal-actions">
+        <button class="tf-btn tf-btn-secondary" onclick="TF.closeModal()">Batal</button>
+        <button class="tf-btn" onclick="TF.submitEditSantri('${s.id}')">Simpan</button>
+      </div>
+    `);
+  }
+
+  async function submitEditSantri(id) {
+    const payload = { id, nama: val('m-nama'), nis: val('m-nis'), kelas_id: val('m-kelas'),
+      jenis_kelamin: val('m-jk'), level_ummi: val('m-level-ummi') };
+    const res = await call('updateSantri', payload);
+    if (!res.ok) { alert(res.error); return; }
+    closeModal(); render();
+  }
+
+  async function deleteSantri(id, nama) {
+    if (!confirm(`Hapus siswa "${nama}"? Data setoran terkait tidak ikut terhapus.`)) return;
+    const res = await call('deleteSantri', { id });
+    if (!res.ok) { alert(res.error); return; }
+    render();
+  }
 
   function openSantriModal() {
     const kelasOptions = (state.cache.kelas || []).map(k => `<option value="${k.id}">${escapeHtml(k.nama_kelas)}</option>`).join('');
@@ -607,10 +661,56 @@ const TF = (() => {
           </div>
         </div>
         <div class="tf-panel-body tf-table-wrap" style="padding-top:0;">
-          ${dataWithNama.length ? listToTable(dataWithNama, [['nama_kelas','Nama Kelas'],['penyimak_nama','Penyimak/Guru']]) : '<div class="tf-empty">Belum ada data kelas.</div>'}
+          ${dataWithNama.length ? `
+          <table class="tf-table"><thead><tr>
+            <th>Nama Kelas</th><th>Penyimak/Guru</th><th>Aksi</th>
+          </tr></thead><tbody>
+          ${dataWithNama.map(k => `<tr>
+            <td>${escapeHtml(k.nama_kelas)}</td>
+            <td>${escapeHtml(k.penyimak_nama)}</td>
+            <td style="white-space:nowrap;">
+              <button class="tf-btn-icon" title="Edit" onclick="TF.openEditKelasModal(${JSON.stringify(k)})">✏️</button>
+              <button class="tf-btn-icon tf-btn-icon-del" title="Hapus" onclick="TF.deleteKelas('${k.id}','${escapeHtml(k.nama_kelas)}')">🗑</button>
+            </td>
+          </tr>`).join('')}
+          </tbody></table>
+          ` : '<div class="tf-empty">Belum ada data kelas.</div>'}
         </div>
       </div>
     `;
+  }
+
+  function openEditKelasModal(k) {
+    const penyimakOptions = (state.cache.penyimakList || [])
+      .map(u => `<option value="${u.id}" ${String(u.id)===String(k.penyimak_id)?'selected':''}>${escapeHtml(u.nama)}</option>`).join('');
+    openModal(`
+      <h3>Edit Kelas</h3>
+      <div class="tf-field"><label>Nama Kelas</label><input id="m-nama-kelas" type="text" value="${escapeHtml(k.nama_kelas||'')}"></div>
+      <div class="tf-field">
+        <label>Penyimak/Guru Pengampu</label>
+        <select id="m-penyimak-id">
+          <option value="">-- belum ditentukan --</option>
+          ${penyimakOptions}
+        </select>
+      </div>
+      <div class="tf-modal-actions">
+        <button class="tf-btn tf-btn-secondary" onclick="TF.closeModal()">Batal</button>
+        <button class="tf-btn" onclick="TF.submitEditKelas('${k.id}')">Simpan</button>
+      </div>
+    `);
+  }
+
+  async function submitEditKelas(id) {
+    const res = await call('updateKelas', { id, nama_kelas: val('m-nama-kelas'), penyimak_id: val('m-penyimak-id') });
+    if (!res.ok) { alert(res.error); return; }
+    closeModal(); render();
+  }
+
+  async function deleteKelas(id, nama) {
+    if (!confirm(`Hapus kelas "${nama}"? Siswa yang terhubung ke kelas ini tidak ikut terhapus.`)) return;
+    const res = await call('deleteKelas', { id });
+    if (!res.ok) { alert(res.error); return; }
+    render();
   }
 
   function openKelasModal() {
@@ -832,17 +932,24 @@ const TF = (() => {
     const meta = state.cache.rekapMeta || {};
     const BN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
-    // ── Label periode ──
-    let periodeLabel = '', periodeRangLabel = '';
+    // ── Label periode & tahun ajaran ──
+    let periodeLabel = '', periodeRangLabel = '', tahunAjaranLabel = '';
+    function getTahunAjaranFE(tahun, bulanMulai) {
+      // bulanMulai 7-12 = sem ganjil; 1-6 = sem genap
+      if (bulanMulai >= 7) return tahun + '/' + (Number(tahun)+1);
+      return (Number(tahun)-1) + '/' + tahun;
+    }
     if (meta.mode === 'semester') {
       const semNum = meta.sem === '1' ? 1 : 2;
       const bM = BN[Number(meta.bulan_mulai)-1], bA = BN[Number(meta.bulan_akhir)-1];
-      periodeLabel     = `Semester ${semNum}  (${bM} – ${bA} ${meta.tahun})`;
-      periodeRangLabel = `1 ${bM} – ${bA.slice(0,3) === bM.slice(0,3) ? '' : ''}${bA} ${meta.tahun}`;
+      periodeLabel     = `Semester ${semNum}  (${bM} \u2013 ${bA} ${meta.tahun})`;
+      periodeRangLabel = `1 ${bM} \u2013 ${bA.slice(0,3) === bM.slice(0,3) ? '' : ''}${bA} ${meta.tahun}`;
+      tahunAjaranLabel = 'Tahun Ajaran ' + getTahunAjaranFE(meta.tahun, Number(meta.bulan_mulai));
     } else {
       const fmtD = v => { if(!v) return ''; const p=v.split('-'); return `${p[2]} ${BN[Number(p[1])-1]} ${p[0]}`; };
-      periodeLabel     = `${fmtD(meta.tgl_mulai)} – ${fmtD(meta.tgl_akhir)}`;
+      periodeLabel     = `${fmtD(meta.tgl_mulai)} \u2013 ${fmtD(meta.tgl_akhir)}`;
       periodeRangLabel = periodeLabel;
+      tahunAjaranLabel = 'Tahun Ajaran ' + getTahunAjaranFE(meta.tahun, 8); // fallback
     }
 
     // ── Tanggal cetak ──
@@ -995,7 +1102,8 @@ const TF = (() => {
         </div>
 
         <div class="rp-judul">
-          <h1>Rapor Tahfiz Al-Qur'an Metode Ummi</h1>
+          <h1>Rapor Perkembangan Pembelajaran Al-Qur'an</h1>
+          <p>${tahunAjaranLabel}</p>
           <p>${periodeLabel}</p>
         </div>
 
@@ -1163,14 +1271,23 @@ const TF = (() => {
     const kelasMapNama = {};
     state.cache.kelas.forEach(k => { kelasMapNama[k.id] = k.nama_kelas; });
 
-    const rowsHtml = res.data.map(u => {
+    const rowsHtml = res.data.map((u, idx) => {
       const kelasNama = u.kelas_id ? (kelasMapNama[u.kelas_id] || '(tidak ditemukan)') : '-';
+      const roleBadge = `<span class="tf-role-badge tf-role-${u.role}">${escapeHtml(u.role)}</span>`;
       const aksiBinaan = u.role === 'penyimak'
-        ? `<button class="tf-btn-sm" onclick="TF.openBinaanModal('${u.id}')">👥 Atur Siswa Binaan</button>`
-        : '-';
+        ? `<button class="tf-btn-sm" onclick="TF.openBinaanModal('${u.id}')">👥 Siswa Binaan</button>`
+        : '';
       return `<tr>
-        <td>${escapeHtml(u.nama)}</td><td>${escapeHtml(u.username)}</td><td>${escapeHtml(u.role)}</td>
-        <td>${escapeHtml(kelasNama)}</td><td>${escapeHtml(u.status)}</td><td>${aksiBinaan}</td>
+        <td>${idx+1}</td>
+        <td>${escapeHtml(u.username)}</td>
+        <td>${escapeHtml(u.nama)}</td>
+        <td>${roleBadge}</td>
+        <td style="white-space:nowrap;">
+          <button class="tf-btn-icon" title="Edit" onclick="TF.openEditUserModal(${JSON.stringify(u)})">✏️</button>
+          <button class="tf-btn-icon" title="Ganti Password" onclick="TF.openChangePasswordModal('${u.id}','${escapeHtml(u.nama)}')">🔑</button>
+          <button class="tf-btn-icon tf-btn-icon-del" title="Hapus" onclick="TF.deleteUser('${u.id}','${escapeHtml(u.nama)}')">🗑</button>
+          ${aksiBinaan}
+        </td>
       </tr>`;
     }).join('');
 
@@ -1181,13 +1298,82 @@ const TF = (() => {
           <button class="tf-add-btn" onclick="TF.openUserModal()">+ Tambah Pengguna</button>
         </div>
         <div class="tf-panel-body tf-table-wrap">
-          <div class="tf-empty" style="margin-bottom:12px;">Penyimak sekarang bisa membina siswa lintas kelas & level. Klik "Atur Siswa Binaan" untuk memilih siswa yang diampu masing-masing penyimak.</div>
+          <div class="tf-empty" style="margin-bottom:12px;">Penyimak bisa membina siswa lintas kelas & level. Klik "Siswa Binaan" untuk mengatur.</div>
           <table class="tf-table"><thead><tr>
-            <th>Nama</th><th>Username</th><th>Role</th><th>Kelas</th><th>Status</th><th>Siswa Binaan</th>
+            <th>ID</th><th>Username</th><th>Nama</th><th>Role</th><th>Aksi</th>
           </tr></thead><tbody>${rowsHtml}</tbody></table>
         </div>
       </div>
     `;
+  }
+
+  function openEditUserModal(u) {
+    const kelasOptions = (state.cache.kelas || []).map(k =>
+      `<option value="${k.id}" ${String(k.id)===String(u.kelas_id)?'selected':''}>${escapeHtml(k.nama_kelas)}</option>`).join('');
+    openModal(`
+      <h3>Edit Pengguna</h3>
+      <div class="tf-field"><label>Nama</label><input id="m-u-nama" type="text" value="${escapeHtml(u.nama||'')}"></div>
+      <div class="tf-grid2">
+        <div class="tf-field"><label>Username</label><input id="m-u-username" type="text" value="${escapeHtml(u.username||'')}"></div>
+        <div class="tf-field"><label>Role</label>
+          <select id="m-u-role">
+            <option value="penyimak" ${u.role==='penyimak'?'selected':''}>Penyimak</option>
+            <option value="santri" ${u.role==='santri'?'selected':''}>Santri</option>
+            <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
+          </select>
+        </div>
+      </div>
+      <div class="tf-field"><label>Kelas (opsional)</label>
+        <select id="m-u-kelas"><option value="">-- tidak ada --</option>${kelasOptions}</select>
+      </div>
+      <div class="tf-field"><label>Status</label>
+        <select id="m-u-status">
+          <option value="aktif" ${u.status==='aktif'?'selected':''}>Aktif</option>
+          <option value="nonaktif" ${u.status==='nonaktif'?'selected':''}>Nonaktif</option>
+        </select>
+      </div>
+      <div class="tf-modal-actions">
+        <button class="tf-btn tf-btn-secondary" onclick="TF.closeModal()">Batal</button>
+        <button class="tf-btn" onclick="TF.submitEditUser('${u.id}')">Simpan</button>
+      </div>
+    `);
+  }
+
+  async function submitEditUser(id) {
+    const payload = { id, nama: val('m-u-nama'), username: val('m-u-username'),
+      role: val('m-u-role'), kelas_id: val('m-u-kelas'), status: val('m-u-status') };
+    const res = await call('updateUser', payload);
+    if (!res.ok) { alert(res.error); return; }
+    closeModal(); render();
+  }
+
+  function openChangePasswordModal(id, nama) {
+    openModal(`
+      <h3>Ganti Password</h3>
+      <p style="color:#666;font-size:13px;margin-bottom:12px;">Pengguna: <b>${escapeHtml(nama)}</b></p>
+      <div class="tf-field"><label>Password Baru</label>
+        <input id="m-new-password" type="text" placeholder="Ketik password baru">
+      </div>
+      <div class="tf-modal-actions">
+        <button class="tf-btn tf-btn-secondary" onclick="TF.closeModal()">Batal</button>
+        <button class="tf-btn" onclick="TF.submitChangePassword('${id}')">Simpan</button>
+      </div>
+    `);
+  }
+
+  async function submitChangePassword(id) {
+    const pwd = val('m-new-password');
+    if (!pwd) { alert('Password tidak boleh kosong'); return; }
+    const res = await call('changePassword', { id, password: pwd });
+    if (!res.ok) { alert(res.error); return; }
+    closeModal(); alert('Password berhasil diubah.');
+  }
+
+  async function deleteUser(id, nama) {
+    if (!confirm(`Hapus pengguna "${nama}"?`)) return;
+    const res = await call('deleteUser', { id });
+    if (!res.ok) { alert(res.error); return; }
+    render();
   }
 
   function openUserModal() {
@@ -1332,6 +1518,10 @@ const TF = (() => {
 
   return {
     login, logout, setView, render, init, toggleSidebar, closeSidebar,
+    openEditSantriModal, submitEditSantri, deleteSantri,
+    openEditKelasModal, submitEditKelas, deleteKelas,
+    openEditUserModal, submitEditUser, deleteUser,
+    openChangePasswordModal, submitChangePassword,
     openSetoranModal, submitSetoran, renderSetoranFields, renderJenisBlocks, onSurahChange,
     onUmmiGradeChange, toggleUmmiBlock,
     openSantriModal, submitSantri, downloadTemplateSiswa, uploadSiswa,
