@@ -150,6 +150,16 @@
     opacity:.7;}
   .tf-ayah-num{color:var(--green);font-size:17px;margin:0 4px;}
   .tf-mushaf-note{font-size:12px;color:#6c8aa0;margin-top:10px;}
+  /* ===== BADGE ROLE & TOMBOL ICON ===== */
+  .tf-role-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;}
+  .tf-role-admin{background:#dbeafe;color:#1e40af;}
+  .tf-role-penyimak{background:#dcfce7;color:#166534;}
+  .tf-role-santri{background:#f1f5f9;color:#475569;}
+  .tf-role-user{background:#f1f5f9;color:#475569;}
+  .tf-btn-icon{background:none;border:1px solid #d1d5db;border-radius:6px;padding:4px 7px;cursor:pointer;font-size:14px;margin:0 2px;transition:.15s;}
+  .tf-btn-icon:hover{background:#f3f4f6;}
+  .tf-btn-icon-del{border-color:#fca5a5;}
+  .tf-btn-icon-del:hover{background:#fee2e2;}
 
   /* ==================== RAPOR CETAK (v3) ==================== */
   .tf-rapor-a4 { background:#fff; font-family:'Liberation Sans',Arial,sans-serif; color:#111; }
