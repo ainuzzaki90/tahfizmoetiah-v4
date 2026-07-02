@@ -900,22 +900,26 @@ const TF = (() => {
 
   async function loadRekap() {
     const mode = val('rk-mode');
-    const tahun = val('rk-tahun');
+    const tahunInput = Number(val('rk-tahun'));  // tahun yg diketik user = tahun awal tahun ajaran
     const kelas_id = val('rk-kelas');
     let payload;
     if (mode === 'semester') {
       const sem = val('rk-semester');
-      payload = sem === '1'
-        ? { bulan_mulai: 7, bulan_akhir: 12, tahun, kelas_id }
-        : { bulan_mulai: 1, bulan_akhir: 6, tahun, kelas_id };
+      if (sem === '1') {
+        // Semester 1: Juli–Desember tahun yg diinput (misal 2026)
+        payload = { bulan_mulai: 7, bulan_akhir: 12, tahun: tahunInput, kelas_id };
+      } else {
+        // Semester 2: Januari–Juni tahun BERIKUTNYA (misal 2027 untuk TA 2026/2027)
+        payload = { bulan_mulai: 1, bulan_akhir: 6, tahun: tahunInput + 1, kelas_id };
+      }
     } else {
-      // Rentang bebas: kirim via tanggal_mulai / tanggal_akhir — backend pakai filter tanggal langsung
       payload = { tanggal_mulai: val('rk-tgl-mulai'), tanggal_akhir: val('rk-tgl-akhir'), kelas_id };
     }
     const res = await call('getRekap', payload);
     state.cache.rekap = res.ok ? res.data : [];
-    state.cache.rekapMeta = { mode, tahun,
+    state.cache.rekapMeta = { mode, tahun: tahunInput,
       bulan_mulai: payload.bulan_mulai, bulan_akhir: payload.bulan_akhir,
+      tahun_data: payload.tahun,   // tahun aktual data (bisa tahunInput+1 untuk sem 2)
       sem: mode === 'semester' ? val('rk-semester') : null,
       tgl_mulai: payload.tanggal_mulai, tgl_akhir: payload.tanggal_akhir };
     const el = document.getElementById('tf-rekap-result');
@@ -936,26 +940,38 @@ const TF = (() => {
     if (!d) return;
 
     const meta = state.cache.rekapMeta || {};
-    const BN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
     // ── Label periode & tahun ajaran ──
+    const BN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
     let periodeLabel = '', periodeRangLabel = '', tahunAjaranLabel = '';
-    function getTahunAjaranFE(tahun, bulanMulai) {
-      // bulanMulai 7-12 = sem ganjil; 1-6 = sem genap
-      if (bulanMulai >= 7) return tahun + '/' + (Number(tahun)+1);
-      return (Number(tahun)-1) + '/' + tahun;
+
+    function getTahunAjaranFE(tahunAwal) {
+      // tahunAwal = tahun awal tahun ajaran (Juli), misal 2026 → "2026/2027"
+      return tahunAwal + '/' + (Number(tahunAwal) + 1);
     }
+
     if (meta.mode === 'semester') {
       const semNum = meta.sem === '1' ? 1 : 2;
-      const bM = BN[Number(meta.bulan_mulai)-1], bA = BN[Number(meta.bulan_akhir)-1];
-      periodeLabel     = `Semester ${semNum}  (${bM} \u2013 ${bA} ${meta.tahun})`;
-      periodeRangLabel = `1 ${bM} \u2013 ${bA.slice(0,3) === bM.slice(0,3) ? '' : ''}${bA} ${meta.tahun}`;
-      tahunAjaranLabel = 'Tahun Ajaran ' + getTahunAjaranFE(meta.tahun, Number(meta.bulan_mulai));
+      const bM = BN[Number(meta.bulan_mulai)-1];
+      const bA = BN[Number(meta.bulan_akhir)-1];
+      // tahun awal TA = selalu tahun yg diinput user (meta.tahun)
+      // tahun_data = tahun aktual data (meta.tahun untuk sem1, meta.tahun+1 untuk sem2)
+      const tahunData = meta.tahun_data || (semNum === 1 ? meta.tahun : Number(meta.tahun) + 1);
+      const tahunAwal = semNum === 1 ? meta.tahun : Number(meta.tahun);
+      // Label: "Semester 1 (Juli – Desember 2026)"
+      periodeLabel     = `Semester ${semNum} (${bM} \u2013 ${bA} ${tahunData})`;
+      // Periode di info siswa: "Juli – Desember 2026" (tanpa angka tanggal)
+      periodeRangLabel = `${bM} \u2013 ${bA} ${tahunData}`;
+      tahunAjaranLabel = 'Tahun Ajaran ' + getTahunAjaranFE(tahunAwal);
     } else {
-      const fmtD = v => { if(!v) return ''; const p=v.split('-'); return `${p[2]} ${BN[Number(p[1])-1]} ${p[0]}`; };
+      const fmtD = v => {
+        if (!v) return '';
+        const p = v.split('-');
+        return `${BN[Number(p[1])-1]} ${p[0]}`;  // "Juli 2026" (tanpa tanggal)
+      };
       periodeLabel     = `${fmtD(meta.tgl_mulai)} \u2013 ${fmtD(meta.tgl_akhir)}`;
       periodeRangLabel = periodeLabel;
-      tahunAjaranLabel = 'Tahun Ajaran ' + getTahunAjaranFE(meta.tahun, 8); // fallback
+      tahunAjaranLabel = '';
     }
 
     // ── Tanggal cetak ──
