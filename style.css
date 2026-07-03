@@ -160,6 +160,13 @@
   .tf-btn-icon:hover{background:#f3f4f6;}
   .tf-btn-icon-del{border-color:#fca5a5;}
   .tf-btn-icon-del:hover{background:#fee2e2;}
+  /* ===== LOADING SPINNER ===== */
+  .tf-loading-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    height:60vh;gap:16px;}
+  .tf-spinner{width:42px;height:42px;border:4px solid rgba(2,132,199,.15);
+    border-top-color:var(--green);border-radius:50%;animation:tf-spin .7s linear infinite;}
+  @keyframes tf-spin{to{transform:rotate(360deg);}}
+  .tf-loading-text{color:#6c8aa0;font-size:14px;margin:0;}
 
   /* ==================== RAPOR CETAK (v3) ==================== */
   .tf-rapor-a4 { background:#fff; font-family:'Liberation Sans',Arial,sans-serif; color:#111; }
