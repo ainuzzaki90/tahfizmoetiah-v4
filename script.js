@@ -72,10 +72,16 @@ const TF = (() => {
     const username = document.getElementById('tf-login-username').value.trim();
     const password = document.getElementById('tf-login-password').value;
     const errEl = document.getElementById('tf-login-error');
+    const btnEl = document.getElementById('tf-login-btn');
     errEl.classList.add('tf-hide');
     if (!username || !password) { errEl.textContent = 'Username dan password wajib diisi'; errEl.classList.remove('tf-hide'); return; }
+    if (btnEl) { btnEl.disabled = true; btnEl.textContent = 'Masuk...'; }
     const res = await call('login', { username, password });
-    if (!res.ok) { errEl.textContent = res.error; errEl.classList.remove('tf-hide'); return; }
+    if (!res.ok) {
+      errEl.textContent = res.error; errEl.classList.remove('tf-hide');
+      if (btnEl) { btnEl.disabled = false; btnEl.textContent = 'Masuk'; }
+      return;
+    }
     state.token = res.token; state.user = res.user;
     saveSession(); render();
   }
@@ -141,6 +147,7 @@ const TF = (() => {
       sidebar.classList.add('tf-hide');
       return;
     }
+    // ── Tampilkan struktur UI langsung (sinkron) ──
     loginView.classList.add('tf-hide'); topbar.classList.remove('tf-hide'); content.classList.remove('tf-hide');
     sidebar.classList.remove('tf-hide');
 
@@ -155,7 +162,14 @@ const TF = (() => {
       menuEl.appendChild(btn);
     });
 
-    content.innerHTML = '<p>Memuat...</p>';
+    // ── Tampilkan spinner langsung sebelum await API ──
+    content.innerHTML = `
+      <div class="tf-loading-wrap">
+        <div class="tf-spinner"></div>
+        <p class="tf-loading-text">Memuat data...</p>
+      </div>`;
+
+    // ── Baru load konten (async — bisa lambat karena API Apps Script) ──
     if (state.view === 'dashboard') await renderDashboard(content);
     else if (state.view === 'setoran') await renderSetoran(content);
     else if (state.view === 'santri') await renderSantri(content);
@@ -1538,6 +1552,14 @@ const TF = (() => {
     loadSession(); render();
     const yearEl = document.getElementById('tf-year');
     if (yearEl) yearEl.textContent = new Date().getFullYear();
+    // Enter di field username → pindah fokus ke password
+    document.getElementById('tf-login-username').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('tf-login-password').focus();
+    });
+    // Enter di field password → langsung login
+    document.getElementById('tf-login-password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') TF.login();
+    });
   }
 
   return {
