@@ -48,7 +48,7 @@ const UMMI_GRADE_TABLE = [
 const LEVEL_JILID_UMMI = ['Jilid 1', 'Jilid 2', 'Jilid 3', 'Jilid 4', 'Jilid 5', 'Jilid 6'];
 
 const TF = (() => {
-  let state = { token: null, user: null, view: 'dashboard', cache: {}, mushafPage: 1, basmalahText: null };
+  let state = { token: null, user: null, view: 'dashboard', cache: {}, mushafPage: 1, basmalahText: null, pageCache: {} };
 
   async function call(action, payload = {}) {
     const res = await fetch(API_URL, {
@@ -90,7 +90,7 @@ const TF = (() => {
     call('logout');
     state.token = null; state.user = null;
     localStorage.removeItem('tf_token'); localStorage.removeItem('tf_user');
-    render();
+    state.pageCache = {}; render();
   }
 
   function menuFor(role) {
@@ -162,6 +162,15 @@ const TF = (() => {
       menuEl.appendChild(btn);
     });
 
+    // ── Tampilkan dari cache jika tersedia (hindari loading tiap pindah menu) ──
+    // Cache di-invalidate setelah tambah/edit/hapus data (lihat fungsi invalidateCache)
+    const CACHEABLE = ['setoran','santri','kelas','statistik','users'];
+    const hasCache = CACHEABLE.includes(state.view) && state.pageCache[state.view];
+    if (hasCache) {
+      content.innerHTML = state.pageCache[state.view];
+      return;
+    }
+
     // ── Tampilkan spinner langsung sebelum await API ──
     content.innerHTML = `
       <div class="tf-loading-wrap">
@@ -178,6 +187,17 @@ const TF = (() => {
     else if (state.view === 'rekap') await renderRekap(content);
     else if (state.view === 'mushaf') await renderMushaf(content);
     else if (state.view === 'users') await renderUsers(content);
+
+    // Simpan hasil render ke pageCache (kecuali rekap & mushaf yang selalu fresh)
+    if (CACHEABLE.includes(state.view)) {
+      state.pageCache[state.view] = content.innerHTML;
+    }
+  }
+
+  // Invalidate cache halaman tertentu setelah mutasi data
+  function invalidateCache(...views) {
+    if (!views.length) { state.pageCache = {}; return; }
+    views.forEach(v => { delete state.pageCache[v]; });
   }
 
   // ---------- DASHBOARD ----------
@@ -227,9 +247,20 @@ const TF = (() => {
 
   // ---------- SETORAN ----------
   async function renderSetoran(content) {
-    const [setoranRes, santriRes] = await Promise.all([call('getSetoran'), call('getSantri')]);
+    // Penyimak: fetch binaan dulu untuk filter dropdown setoran
+    // Admin: lihat semua santri
+    const calls = [call('getSetoran'), call('getSantri')];
+    if (state.user.role === 'penyimak') calls.push(call('getPenyimakSantri', {}));
+    const [setoranRes, santriRes, binaanRes] = await Promise.all(calls);
     if (!setoranRes.ok) { content.innerHTML = '<p class="tf-error">' + setoranRes.error + '</p>'; return; }
     state.cache.santri = santriRes.ok ? santriRes.data : [];
+    // Untuk dropdown setoran: penyimak hanya binaan, admin semua
+    if (state.user.role === 'penyimak' && binaanRes && binaanRes.ok) {
+      const binaanIds = binaanRes.data.map(b => String(b.santri_id));
+      state.cache.santriSetoran = state.cache.santri.filter(s => binaanIds.includes(String(s.id)));
+    } else {
+      state.cache.santriSetoran = state.cache.santri;
+    }
     const santriMap = {};
     state.cache.santri.forEach(s => { santriMap[s.id] = s.nama; });
     const dataWithNama = setoranRes.data.map(r => Object.assign({}, r, {
@@ -255,7 +286,7 @@ const TF = (() => {
   }
 
   function openSetoranModal() {
-    const santriOptions = (state.cache.santri || [])
+    const santriOptions = (state.cache.santriSetoran || state.cache.santri || [])
       .map(s => `<option value="${s.id}" data-level="${escapeHtml(s.level_ummi || '')}">${escapeHtml(s.nama)}</option>`).join('');
     openModal(`
       <h3>Tambah Setoran</h3>
@@ -418,7 +449,7 @@ const TF = (() => {
     blocksEl.innerHTML = checked.map((j, i) => jenisBlockHtml(j, i)).join('');
   }
 
-  async function submitSetoran() {
+  async function submitSetoran() { // mutasi: invalidate setoran + dashboard
     const sel = document.getElementById('m-santri');
     const santriId = sel.value;
     const level = sel.options.length ? sel.options[sel.selectedIndex].dataset.level : '';
@@ -552,14 +583,14 @@ const TF = (() => {
       jenis_kelamin: val('m-jk'), level_ummi: val('m-level-ummi') };
     const res = await call('updateSantri', payload);
     if (!res.ok) { alert(res.error); return; }
-    closeModal(); render();
+    invalidateCache('santri','setoran','dashboard'); closeModal(); render();
   }
 
   async function deleteSantri(id, nama) {
     if (!confirm(`Hapus siswa "${nama}"? Data setoran terkait tidak ikut terhapus.`)) return;
     const res = await call('deleteSantri', { id });
     if (!res.ok) { alert(res.error); return; }
-    render();
+    invalidateCache('santri','setoran','dashboard'); render();
   }
 
   function openSantriModal() {
@@ -588,7 +619,7 @@ const TF = (() => {
       jenis_kelamin: val('m-jk'), level_ummi: val('m-level-ummi') };
     const res = await call('addSantri', payload);
     if (!res.ok) { alert(res.error); return; }
-    closeModal(); render();
+    invalidateCache('santri','setoran','dashboard'); closeModal(); render();
   }
 
   function downloadTemplateSiswa() {
@@ -723,14 +754,14 @@ const TF = (() => {
   async function submitEditKelas(id) {
     const res = await call('updateKelas', { id, nama_kelas: val('m-nama-kelas'), penyimak_id: val('m-penyimak-id') });
     if (!res.ok) { alert(res.error); return; }
-    closeModal(); render();
+    invalidateCache('kelas','santri','setoran'); closeModal(); render();
   }
 
   async function deleteKelas(id, nama) {
     if (!confirm(`Hapus kelas "${nama}"? Siswa yang terhubung ke kelas ini tidak ikut terhapus.`)) return;
     const res = await call('deleteKelas', { id });
     if (!res.ok) { alert(res.error); return; }
-    render();
+    invalidateCache('kelas','santri'); render();
   }
 
   function openKelasModal() {
@@ -757,7 +788,7 @@ const TF = (() => {
   async function submitKelas() {
     const res = await call('addKelas', { nama_kelas: val('m-nama-kelas'), penyimak_id: val('m-penyimak-id') });
     if (!res.ok) { alert(res.error); return; }
-    closeModal(); render();
+    invalidateCache('kelas','santri'); closeModal(); render();
   }
 
   // ---------- STATISTIK ----------
@@ -1382,7 +1413,7 @@ const TF = (() => {
       role: val('m-u-role'), kelas_id: val('m-u-kelas'), status: val('m-u-status') };
     const res = await call('updateUser', payload);
     if (!res.ok) { alert(res.error); return; }
-    closeModal(); render();
+    invalidateCache('users'); closeModal(); render();
   }
 
   function openChangePasswordModal(id, nama) {
@@ -1411,7 +1442,7 @@ const TF = (() => {
     if (!confirm(`Hapus pengguna "${nama}"?`)) return;
     const res = await call('deleteUser', { id });
     if (!res.ok) { alert(res.error); return; }
-    render();
+    invalidateCache('users'); render();
   }
 
   function openUserModal() {
@@ -1442,7 +1473,7 @@ const TF = (() => {
     const payload = { nama: val('m-u-nama'), username: val('m-u-username'), password: val('m-u-password'), role: val('m-u-role'), kelas_id: val('m-u-kelas') };
     const res = await call('addUser', payload);
     if (!res.ok) { alert(res.error); return; }
-    closeModal(); render();
+    invalidateCache('users'); closeModal(); render();
   }
 
   // ---------- BINAAN PENYIMAK (siswa lintas kelas & level) ----------
@@ -1493,7 +1524,7 @@ const TF = (() => {
     const santriIds = Array.from(document.querySelectorAll('.tf-binaan-toggle:checked')).map(c => c.value);
     const res = await call('setPenyimakSantri', { penyimak_id: penyimakId, santri_ids: santriIds });
     if (!res.ok) { alert(res.error); return; }
-    closeModal(); render();
+    invalidateCache('users','setoran'); closeModal(); render();
   }
 
   // ---------- utilities ----------
