@@ -207,12 +207,11 @@ const TF = (() => {
     const santriMap = {};
     state.cache.santri = santriRes.ok ? santriRes.data : [];
     state.cache.santri.forEach(s => { santriMap[s.id] = s.nama; });
-    // Set santriSetoran untuk dropdown setoran (penyimak: hanya binaan, admin: semua)
+    // Preload santriSetoran untuk dropdown modal setoran
     if (!state.cache.santriSetoran) {
       if (state.user.role === 'penyimak') {
-        const binaanRes = await call('getPenyimakSantri', {});
-        const binaanIds = binaanRes.ok ? binaanRes.data.map(b => String(b.santri_id)) : [];
-        state.cache.santriSetoran = state.cache.santri.filter(s => binaanIds.includes(String(s.id)));
+        const binaanRes = await call('getSantri', { binaan_only: true });
+        state.cache.santriSetoran = binaanRes.ok ? binaanRes.data : [];
       } else {
         state.cache.santriSetoran = state.cache.santri;
       }
@@ -258,20 +257,19 @@ const TF = (() => {
 
   // ---------- SETORAN ----------
   async function renderSetoran(content) {
-    // Penyimak: fetch binaan dulu untuk filter dropdown setoran
-    // Admin: lihat semua santri
-    const calls = [call('getSetoran'), call('getSantri')];
-    if (state.user.role === 'penyimak') calls.push(call('getPenyimakSantri', {}));
-    const [setoranRes, santriRes, binaanRes] = await Promise.all(calls);
+    const isPenyimak = state.user.role === 'penyimak';
+    const [setoranRes, santriRes, santriSetoranRes] = await Promise.all([
+      call('getSetoran'),
+      call('getSantri'),                                    // semua siswa (untuk nama di tabel)
+      isPenyimak ? call('getSantri', { binaan_only: true }) // penyimak: hanya binaan untuk dropdown
+                 : Promise.resolve({ ok: true, data: null })
+    ]);
     if (!setoranRes.ok) { content.innerHTML = '<p class="tf-error">' + setoranRes.error + '</p>'; return; }
     state.cache.santri = santriRes.ok ? santriRes.data : [];
-    // Untuk dropdown setoran: penyimak hanya binaan, admin semua
-    if (state.user.role === 'penyimak' && binaanRes && binaanRes.ok) {
-      const binaanIds = binaanRes.data.map(b => String(b.santri_id));
-      state.cache.santriSetoran = state.cache.santri.filter(s => binaanIds.includes(String(s.id)));
-    } else {
-      state.cache.santriSetoran = state.cache.santri;
-    }
+    // Dropdown setoran: penyimak→binaan saja, admin→semua
+    state.cache.santriSetoran = isPenyimak
+      ? (santriSetoranRes.ok && santriSetoranRes.data ? santriSetoranRes.data : [])
+      : state.cache.santri;
     const santriMap = {};
     state.cache.santri.forEach(s => { santriMap[s.id] = s.nama; });
     const dataWithNama = setoranRes.data.map(r => Object.assign({}, r, {
