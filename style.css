@@ -160,11 +160,6 @@
   .tf-btn-icon:hover{background:#f3f4f6;}
   .tf-btn-icon-del{border-color:#fca5a5;}
   .tf-btn-icon-del:hover{background:#fee2e2;}
-  /* ===== SORTABLE TABLE HEADER ===== */
-  .tf-th-sort{cursor:pointer;user-select:none;white-space:nowrap;}
-  .tf-th-sort:hover{background:rgba(2,132,199,.08);}
-  .tf-sort-icon{color:#9ca3af;font-size:11px;margin-left:3px;}
-  .tf-sort-active{color:var(--green);font-weight:700;}
   /* ===== LOADING SPINNER ===== */
   .tf-loading-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;
     height:60vh;gap:16px;}
