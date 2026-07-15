@@ -272,8 +272,12 @@ const TF = (() => {
       : state.cache.santri;
     const santriMap = {};
     state.cache.santri.forEach(s => { santriMap[s.id] = s.nama; });
-    const dataWithNama = setoranRes.data.map(r => Object.assign({}, r, {
-      nama_santri: santriMap[r.santri_id] || '(siswa terhapus)',
+    const kelasMap = {};
+    (state.cache.kelas || []).forEach(k => { kelasMap[k.id] = k.nama_kelas; });
+    state.cache.setoranList = setoranRes.data.map(r => Object.assign({}, r, {
+      santri_nama: santriMap[r.santri_id] || '(siswa terhapus)',
+      kelas_nama: kelasMap[r.kelas_id] || '-',
+      tanggal_fmt: r.tanggal ? r.tanggal.substring(0,10) : '-',
       lokasi: formatLokasiSetoran(r)
     }));
     const canAdd = state.user.role === 'admin' || state.user.role === 'penyimak';
@@ -283,12 +287,8 @@ const TF = (() => {
         <div class="tf-panel-head">Daftar Setoran
           ${canAdd ? '<button class="tf-add-btn" onclick="TF.openSetoranModal()">+ Tambah Setoran</button>' : ''}
         </div>
-        <div class="tf-panel-body tf-table-wrap">
-          ${dataWithNama.length ? listToTable(dataWithNama, [
-            ['nama_santri','Nama Siswa'],['tanggal','Tanggal'],['lokasi','Surah/Halaman'],['jenis','Jenis'],
-            ['nilai','Nilai'],['predikat','Predikat'],['nilai_tajwid','Tajwid'],['nilai_fashohah','Fashohah'],
-            ['nilai_kelancaran','Kelancaran'],['catatan','Catatan']
-          ]) : '<div class="tf-empty">Belum ada data setoran.</div>'}
+        <div class="tf-panel-body tf-table-wrap" id="tf-table-setoran">
+          ${buildTableHtml('setoran')}
         </div>
       </div>
     `;
@@ -534,24 +534,8 @@ const TF = (() => {
             <button class="tf-add-btn" onclick="TF.openSantriModal()">+ Tambah Siswa</button>
           </div>
         </div>
-        <div class="tf-panel-body tf-table-wrap">
-          ${dataWithKelasNama.length ? `
-          <table class="tf-table"><thead><tr>
-            <th>Nama</th><th>NIS</th><th>Kelas</th><th>Level Ummi</th><th>Jenis Kelamin</th><th>Aksi</th>
-          </tr></thead><tbody>
-          ${dataWithKelasNama.map(s => `<tr>
-            <td>${escapeHtml(s.nama)}</td>
-            <td>${escapeHtml(s.nis||'-')}</td>
-            <td>${escapeHtml(s.kelas_nama)}</td>
-            <td>${escapeHtml(s.level_ummi||'-')}</td>
-            <td>${escapeHtml(s.jenis_kelamin||'-')}</td>
-            <td style="white-space:nowrap;">
-              <button class="tf-btn-icon" title="Edit" onclick="TF.openEditSantriModal('${s.id}')">✏️</button>
-              <button class="tf-btn-icon tf-btn-icon-del" title="Hapus" onclick="TF.deleteSantri('${s.id}','${escapeHtml(s.nama)}')">🗑</button>
-            </td>
-          </tr>`).join('')}
-          </tbody></table>
-          ` : '<div class="tf-empty">Belum ada data siswa.</div>'}
+        <div class="tf-panel-body tf-table-wrap" id="tf-table-santri">
+          ${buildTableHtml('santri')}
         </div>
       </div>
     `;
@@ -718,21 +702,8 @@ const TF = (() => {
             "Kelas" di sini adalah rombongan belajar (contoh: Kelas 7A, Halaqah Pagi). Setiap siswa dan setoran akan terhubung ke salah satu kelas ini.
           </div>
         </div>
-        <div class="tf-panel-body tf-table-wrap" style="padding-top:0;">
-          ${dataWithNama.length ? `
-          <table class="tf-table"><thead><tr>
-            <th>Nama Kelas</th><th>Penyimak/Guru</th><th>Aksi</th>
-          </tr></thead><tbody>
-          ${dataWithNama.map(k => `<tr>
-            <td>${escapeHtml(k.nama_kelas)}</td>
-            <td>${escapeHtml(k.penyimak_nama)}</td>
-            <td style="white-space:nowrap;">
-              <button class="tf-btn-icon" title="Edit" onclick="TF.openEditKelasModal('${k.id}')">✏️</button>
-              <button class="tf-btn-icon tf-btn-icon-del" title="Hapus" onclick="TF.deleteKelas('${k.id}','${escapeHtml(k.nama_kelas)}')">🗑</button>
-            </td>
-          </tr>`).join('')}
-          </tbody></table>
-          ` : '<div class="tf-empty">Belum ada data kelas.</div>'}
+        <div class="tf-panel-body tf-table-wrap" style="padding-top:0;" id="tf-table-kelas">
+          ${buildTableHtml('kelas')}
         </div>
       </div>
     `;
@@ -978,14 +949,13 @@ const TF = (() => {
       tgl_mulai: payload.tanggal_mulai, tgl_akhir: payload.tanggal_akhir };
     const el = document.getElementById('tf-rekap-result');
     if (!res.ok) { el.innerHTML = '<p class="tf-error">' + res.error + '</p>'; return; }
-    el.innerHTML = res.data.length ? `<div class="tf-table-wrap"><table class="tf-table"><thead><tr>
-        <th>Nama</th><th>NIS</th><th>Kelas</th><th>Level Ummi</th><th>Guru Pengampu</th><th>Total Setoran</th><th>Rata Nilai</th><th>Aksi</th>
-      </tr></thead><tbody>${res.data.map(d => `<tr>
-        <td>${escapeHtml(d.nama)}</td><td>${escapeHtml(d.nis)}</td><td>${escapeHtml(d.kelas_nama)}</td>
-        <td>${escapeHtml(d.level_ummi)}</td><td>${escapeHtml(d.penyimak_nama || '-')}</td>
-        <td>${d.total_setoran}</td><td>${d.rata_nilai}</td>
-        <td><button class="tf-btn-sm" onclick="TF.cetakRapor('${d.santri_id}')">🖨 Cetak Rapor</button></td>
-      </tr>`).join('')}</tbody></table></div>` : '<div class="tf-empty">Tidak ada data pada periode ini.</div>';
+    // Simpan rekap ke cache dengan field yang konsisten untuk sorting
+    state.cache.rekap = res.data.map(d => Object.assign({}, d, {
+      guru_pengampu: d.penyimak_nama || '-'
+    }));
+    el.innerHTML = res.data.length
+      ? `<div class="tf-table-wrap" id="tf-table-rekap">${buildTableHtml('rekap')}</div>`
+      : '<div class="tf-empty">Tidak ada data pada periode ini.</div>';
   }
 
   // ---------- CETAK RAPOR (desain ringkasan v1 + kop resmi + ttd v2) ----------
@@ -1373,11 +1343,8 @@ const TF = (() => {
         <div class="tf-panel-head">Daftar Pengguna
           <button class="tf-add-btn" onclick="TF.openUserModal()">+ Tambah Pengguna</button>
         </div>
-        <div class="tf-panel-body tf-table-wrap">
-          <div class="tf-empty" style="margin-bottom:12px;">Penyimak bisa membina siswa lintas kelas & level. Klik "Siswa Binaan" untuk mengatur.</div>
-          <table class="tf-table"><thead><tr>
-            <th>ID</th><th>Username</th><th>Nama</th><th>Role</th><th>Aksi</th>
-          </tr></thead><tbody>${rowsHtml}</tbody></table>
+        <div class="tf-panel-body tf-table-wrap" id="tf-table-users">
+          ${buildTableHtml('users')}
         </div>
       </div>
     `;
@@ -1560,6 +1527,175 @@ const TF = (() => {
   function escapeHtml(str) {
     return String(str ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   }
+  // ============================================================
+  // SORTING UNIVERSAL - dipakai di semua halaman tabel
+  // state.sort = { key, dir } per view
+  // ============================================================
+  if (!state.sort) state.sort = {};
+
+  function getSortState(view) {
+    return state.sort[view] || { key: null, dir: 'asc' };
+  }
+
+  function sortData(data, key, dir) {
+    if (!key) return data;
+    return data.slice().sort((a, b) => {
+      let va = a[key], vb = b[key];
+      // Angka
+      if (!isNaN(parseFloat(va)) && !isNaN(parseFloat(vb))) {
+        va = parseFloat(va) || 0; vb = parseFloat(vb) || 0;
+      } else {
+        va = String(va || '').toLowerCase(); vb = String(vb || '').toLowerCase();
+      }
+      if (va < vb) return dir === 'asc' ? -1 : 1;
+      if (va > vb) return dir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
+  function sortIcon(view, key) {
+    const s = getSortState(view);
+    if (s.key !== key) return '<span class="tf-sort-icon">⇅</span>';
+    return s.dir === 'asc'
+      ? '<span class="tf-sort-icon tf-sort-active">↑</span>'
+      : '<span class="tf-sort-icon tf-sort-active">↓</span>';
+  }
+
+  function thSort(view, key, label) {
+    return `<th class="tf-th-sort" onclick="TF.clickSort('${view}','${key}')">${label} ${sortIcon(view, key)}</th>`;
+  }
+
+  function clickSort(view, key) {
+    const s = getSortState(view);
+    state.sort[view] = { key, dir: s.key === key && s.dir === 'asc' ? 'desc' : 'asc' };
+    rerenderTable(view);
+  }
+
+  function rerenderTable(view) {
+    const el = document.getElementById('tf-table-' + view);
+    if (!el) return;
+    el.innerHTML = buildTableHtml(view);
+  }
+
+  function buildTableHtml(view) {
+    const s = getSortState(view);
+    if (view === 'santri') {
+      const data = sortData(state.cache.santriList || [], s.key, s.dir);
+      if (!data.length) return '<div class="tf-empty">Belum ada data siswa.</div>';
+      return `<table class="tf-table"><thead><tr>
+        ${thSort('santri','nama','Nama')}
+        ${thSort('santri','nis','NIS')}
+        ${thSort('santri','kelas_nama','Kelas')}
+        ${thSort('santri','level_ummi','Level Ummi')}
+        ${thSort('santri','jenis_kelamin','Jenis Kelamin')}
+        <th>Aksi</th></tr></thead><tbody>
+        ${data.map(s => `<tr>
+          <td>${escapeHtml(s.nama)}</td>
+          <td>${escapeHtml(s.nis||'-')}</td>
+          <td>${escapeHtml(s.kelas_nama)}</td>
+          <td>${escapeHtml(s.level_ummi||'-')}</td>
+          <td>${escapeHtml(s.jenis_kelamin||'-')}</td>
+          <td style="white-space:nowrap;">
+            <button class="tf-btn-icon" title="Edit" onclick="TF.openEditSantriModal('${s.id}')">✏️</button>
+            <button class="tf-btn-icon tf-btn-icon-del" title="Hapus" onclick="TF.deleteSantri('${s.id}','${escapeHtml(s.nama)}')">🗑</button>
+          </td></tr>`).join('')}
+      </tbody></table>`;
+    }
+    if (view === 'kelas') {
+      const data = sortData(state.cache.kelasList || [], s.key, s.dir);
+      if (!data.length) return '<div class="tf-empty">Belum ada data kelas.</div>';
+      return `<table class="tf-table"><thead><tr>
+        ${thSort('kelas','nama_kelas','Nama Kelas')}
+        ${thSort('kelas','penyimak_nama','Penyimak/Guru')}
+        <th>Aksi</th></tr></thead><tbody>
+        ${data.map(k => `<tr>
+          <td>${escapeHtml(k.nama_kelas)}</td>
+          <td>${escapeHtml(k.penyimak_nama)}</td>
+          <td style="white-space:nowrap;">
+            <button class="tf-btn-icon" title="Edit" onclick="TF.openEditKelasModal('${k.id}')">✏️</button>
+            <button class="tf-btn-icon tf-btn-icon-del" title="Hapus" onclick="TF.deleteKelas('${k.id}','${escapeHtml(k.nama_kelas)}')">🗑</button>
+          </td></tr>`).join('')}
+      </tbody></table>`;
+    }
+    if (view === 'users') {
+      const data = sortData(state.cache.users || [], s.key, s.dir);
+      if (!data.length) return '<div class="tf-empty">Belum ada pengguna.</div>';
+      return `<table class="tf-table"><thead><tr>
+        ${thSort('users','id','ID')}
+        ${thSort('users','username','Username')}
+        ${thSort('users','nama','Nama')}
+        ${thSort('users','role','Role')}
+        <th>Aksi</th></tr></thead><tbody>
+        ${data.map((u, idx) => `<tr>
+          <td>${idx+1}</td>
+          <td>${escapeHtml(u.username)}</td>
+          <td>${escapeHtml(u.nama)}</td>
+          <td><span class="tf-role-badge tf-role-${u.role}">${escapeHtml(u.role)}</span></td>
+          <td style="white-space:nowrap;">
+            <button class="tf-btn-icon" title="Edit" onclick="TF.openEditUserModal('${u.id}')">✏️</button>
+            <button class="tf-btn-icon" title="Ganti Password" onclick="TF.openChangePasswordModal('${u.id}','${escapeHtml(u.nama)}')">🔑</button>
+            <button class="tf-btn-icon tf-btn-icon-del" title="Hapus" onclick="TF.deleteUser('${u.id}','${escapeHtml(u.nama)}')">🗑</button>
+            ${u.role === 'penyimak' ? `<button class="tf-btn-sm" onclick="TF.openBinaanModal('${u.id}')">👥 Siswa Binaan</button>` : ''}
+          </td></tr>`).join('')}
+      </tbody></table>`;
+    }
+    if (view === 'setoran') {
+      const data = sortData(state.cache.setoranList || [], s.key, s.dir);
+      if (!data.length) return '<div class="tf-empty">Belum ada setoran.</div>';
+      return `<table class="tf-table"><thead><tr>
+        ${thSort('setoran','tanggal','Tanggal')}
+        ${thSort('setoran','santri_nama','Nama Siswa')}
+        ${thSort('setoran','kelas_nama','Kelas')}
+        ${thSort('setoran','jenis','Jenis')}
+        ${thSort('setoran','nilai','Nilai')}
+        ${thSort('setoran','predikat','Predikat')}
+        <th>Aksi</th></tr></thead><tbody>
+        ${data.map(r => `<tr>
+          <td>${escapeHtml(r.tanggal_fmt||r.tanggal||'-')}</td>
+          <td>${escapeHtml(r.santri_nama||'-')}</td>
+          <td>${escapeHtml(r.kelas_nama||'-')}</td>
+          <td><span class="tf-badge ${r.jenis==='Murojaah'?'b-murajaah':r.jenis==='Tilawah'?'b-tilawah':r.jenis==='Setoran Metode Ummi'?'b-ummi':'b-hafalan'}">${escapeHtml(r.jenis||'-')}</span></td>
+          <td style="text-align:center;">${escapeHtml(String(r.nilai||'-'))}</td>
+          <td>${escapeHtml(r.predikat||'-')}</td>
+          <td style="white-space:nowrap;">
+            <button class="tf-btn-icon" onclick="TF.openEditSetoranModal('${r.id}')">✏️</button>
+            <button class="tf-btn-icon tf-btn-icon-del" onclick="TF.deleteSetoran('${r.id}')">🗑</button>
+          </td></tr>`).join('')}
+      </tbody></table>`;
+    }
+    if (view === 'rekap') {
+      const data = sortData(state.cache.rekap || [], s.key, s.dir);
+      if (!data.length) return '<div class="tf-empty">Tidak ada data rekap.</div>';
+      return `<table class="tf-table"><thead><tr>
+        <th>#</th>
+        ${thSort('rekap','nama','Nama')}
+        ${thSort('rekap','kelas_nama','Kelas')}
+        ${thSort('rekap','level_ummi','Level Ummi')}
+        ${thSort('rekap','guru_pengampu','Guru Pengampu')}
+        ${thSort('rekap','total_setoran','Total Setoran')}
+        ${thSort('rekap','rata_nilai','Rata-rata Nilai')}
+        ${thSort('rekap','predikat','Predikat')}
+        <th>Aksi</th></tr></thead><tbody>
+        ${data.map((r, i) => `<tr>
+          <td style="text-align:center;">${i+1}</td>
+          <td>${escapeHtml(r.nama)}</td>
+          <td>${escapeHtml(r.kelas_nama||'-')}</td>
+          <td>${escapeHtml(r.level_ummi||'-')}</td>
+          <td>${escapeHtml(r.guru_pengampu||'-')}</td>
+          <td style="text-align:center;font-weight:700;">${r.total_setoran}</td>
+          <td style="text-align:center;">${r.rata_nilai}</td>
+          <td>${escapeHtml(r.predikat||'-')}</td>
+          <td><button class="tf-btn-sm" onclick="TF.cetakRapor('${r.santri_id}')">🖨 Rapor</button></td>
+        </tr>`).join('')}
+      </tbody></table>`;
+    }
+    return '';
+  }
+
+  function initSortState() {
+    // Reset sort state per view saat halaman pertama kali dirender
+  }
+
   function listToTable(rows, cols) {
     let html = '<table class="tf-table"><thead><tr>';
     cols.forEach(c => html += `<th>${c[1]}</th>`);
@@ -1608,6 +1744,7 @@ const TF = (() => {
     openEditKelasModal, submitEditKelas, deleteKelas,
     openEditUserModal, submitEditUser, deleteUser,
     openChangePasswordModal, submitChangePassword,
+    clickSort,
     openSetoranModal, submitSetoran, renderSetoranFields, renderJenisBlocks, onSurahChange,
     onUmmiGradeChange, toggleUmmiBlock,
     openSantriModal, submitSantri, downloadTemplateSiswa, uploadSiswa,
