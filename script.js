@@ -233,11 +233,12 @@ const TF = (() => {
       </div>
     `;
     document.getElementById('tf-dash-setoran').innerHTML = res.setoran_terbaru.length
-      ? listToTable(res.setoran_terbaru.map(r => Object.assign({}, r, {
+      ? listToTable(res.setoran_terbaru.map((r, i) => Object.assign({}, r, {
+          no: i + 1,
           nama_santri: santriMap[r.santri_id] || '(siswa terhapus)',
           lokasi: formatLokasiSetoran(r)
         })), [
-          ['nama_santri','Nama Siswa'],['tanggal','Tanggal'],['lokasi','Surah/Halaman'],['jenis','Jenis'],['nilai','Nilai'],['predikat','Predikat']
+          ['no','#'],['nama_santri','Nama Siswa'],['tanggal','Tanggal'],['lokasi','Surah/Halaman'],['jenis','Jenis'],['nilai','Nilai'],['predikat','Predikat']
         ])
       : '<div class="tf-empty">Belum ada setoran tercatat.</div>';
   }
@@ -1583,13 +1584,15 @@ const TF = (() => {
       const data = sortData(state.cache.santriList || [], s.key, s.dir);
       if (!data.length) return '<div class="tf-empty">Belum ada data siswa.</div>';
       return `<table class="tf-table"><thead><tr>
+        <th>#</th>
         ${thSort('santri','nama','Nama')}
         ${thSort('santri','nis','NIS')}
         ${thSort('santri','kelas_nama','Kelas')}
         ${thSort('santri','level_ummi','Level Ummi')}
         ${thSort('santri','jenis_kelamin','Jenis Kelamin')}
         <th>Aksi</th></tr></thead><tbody>
-        ${data.map(s => `<tr>
+        ${data.map((s, i) => `<tr>
+          <td style="text-align:center;color:#9ca3af;font-size:12px;">${i+1}</td>
           <td>${escapeHtml(s.nama)}</td>
           <td>${escapeHtml(s.nis||'-')}</td>
           <td>${escapeHtml(s.kelas_nama)}</td>
@@ -1605,10 +1608,12 @@ const TF = (() => {
       const data = sortData(state.cache.kelasList || [], s.key, s.dir);
       if (!data.length) return '<div class="tf-empty">Belum ada data kelas.</div>';
       return `<table class="tf-table"><thead><tr>
+        <th>#</th>
         ${thSort('kelas','nama_kelas','Nama Kelas')}
         ${thSort('kelas','penyimak_nama','Penyimak/Guru')}
         <th>Aksi</th></tr></thead><tbody>
-        ${data.map(k => `<tr>
+        ${data.map((k, i) => `<tr>
+          <td style="text-align:center;color:#9ca3af;font-size:12px;">${i+1}</td>
           <td>${escapeHtml(k.nama_kelas)}</td>
           <td>${escapeHtml(k.penyimak_nama)}</td>
           <td style="white-space:nowrap;">
@@ -1621,13 +1626,13 @@ const TF = (() => {
       const data = sortData(state.cache.users || [], s.key, s.dir);
       if (!data.length) return '<div class="tf-empty">Belum ada pengguna.</div>';
       return `<table class="tf-table"><thead><tr>
-        ${thSort('users','id','ID')}
+        <th>#</th>
         ${thSort('users','username','Username')}
         ${thSort('users','nama','Nama')}
         ${thSort('users','role','Role')}
         <th>Aksi</th></tr></thead><tbody>
         ${data.map((u, idx) => `<tr>
-          <td>${idx+1}</td>
+          <td style="text-align:center;color:#9ca3af;font-size:12px;">${idx+1}</td>
           <td>${escapeHtml(u.username)}</td>
           <td>${escapeHtml(u.nama)}</td>
           <td><span class="tf-role-badge tf-role-${u.role}">${escapeHtml(u.role)}</span></td>
@@ -1643,6 +1648,7 @@ const TF = (() => {
       const data = sortData(state.cache.setoranList || [], s.key, s.dir);
       if (!data.length) return '<div class="tf-empty">Belum ada setoran.</div>';
       return `<table class="tf-table"><thead><tr>
+        <th>#</th>
         ${thSort('setoran','tanggal','Tanggal')}
         ${thSort('setoran','santri_nama','Nama Siswa')}
         ${thSort('setoran','kelas_nama','Kelas')}
@@ -1650,7 +1656,8 @@ const TF = (() => {
         ${thSort('setoran','nilai','Nilai')}
         ${thSort('setoran','predikat','Predikat')}
         <th>Aksi</th></tr></thead><tbody>
-        ${data.map(r => `<tr>
+        ${data.map((r, i) => `<tr>
+          <td style="text-align:center;color:#9ca3af;font-size:12px;">${i+1}</td>
           <td>${escapeHtml(r.tanggal_fmt||r.tanggal||'-')}</td>
           <td>${escapeHtml(r.santri_nama||'-')}</td>
           <td>${escapeHtml(r.kelas_nama||'-')}</td>
@@ -1697,13 +1704,19 @@ const TF = (() => {
   }
 
   function listToTable(rows, cols) {
+    const hasNo = cols.length > 0 && cols[0][0] === 'no';
     let html = '<table class="tf-table"><thead><tr>';
-    cols.forEach(c => html += `<th>${c[1]}</th>`);
+    cols.forEach(c => {
+      if (c[0] === 'no') html += `<th>#</th>`;
+      else html += `<th>${c[1]}</th>`;
+    });
     html += '</tr></thead><tbody>';
-    rows.forEach(r => {
+    rows.forEach((r, idx) => {
       html += '<tr>';
       cols.forEach(c => {
-        if (c[0] === 'jenis' && r[c[0]]) {
+        if (c[0] === 'no') {
+          html += `<td style="text-align:center;color:#9ca3af;font-size:12px;">${idx+1}</td>`;
+        } else if (c[0] === 'jenis' && r[c[0]]) {
           const cls = r[c[0]] === 'Murojaah' ? 'b-murajaah' : (r[c[0]] === 'Tilawah' ? 'b-tilawah' : (r[c[0]] === 'Setoran Metode Ummi' ? 'b-ummi' : 'b-hafalan'));
           html += `<td><span class="tf-badge ${cls}">${escapeHtml(r[c[0]])}</span></td>`;
         } else if (c[0] === 'tanggal') {
