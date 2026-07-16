@@ -521,15 +521,24 @@ const TF = (() => {
     ]);
     if (!santriRes.ok) { content.innerHTML = '<p class="tf-error">' + santriRes.error + '</p>'; return; }
     state.cache.kelas = kelasRes.ok ? kelasRes.data : [];
-    state.cache.users = usersRes.ok ? usersRes.data : [];
+    if (usersRes.ok) state.cache.users = usersRes.data;
+
+    // Build userMap — getUsers hanya berhasil untuk admin.
+    // Untuk penyimak, cukup tambahkan diri sendiri ke userMap agar
+    // nama guru pengampu siswa binaannya tetap tampil.
+    const userMap = {};
+    (state.cache.users || []).forEach(u => { userMap[String(u.id)] = u.nama; });
+    // Selalu masukkan user yang sedang login (fallback untuk penyimak)
+    const myId = String(state.user.id || state.user.user_id || '');
+    if (myId) userMap[myId] = state.user.nama;
+
     const kelasMapNama = {};
     state.cache.kelas.forEach(k => { kelasMapNama[k.id] = k.nama_kelas; });
-    const userMap = {};
-    state.cache.users.forEach(u => { userMap[u.id] = u.nama; });
     const santriPenyimakMap = {};
     if (binaanRes.ok) {
       binaanRes.data.forEach(b => {
-        santriPenyimakMap[String(b.santri_id)] = userMap[b.penyimak_id] || '-';
+        const guruNama = userMap[String(b.penyimak_id)];
+        if (guruNama) santriPenyimakMap[String(b.santri_id)] = guruNama;
       });
     }
     const dataWithKelasNama = santriRes.data.map(s => Object.assign({}, s, {
@@ -864,13 +873,13 @@ const TF = (() => {
     const isAdmin = state.user.role === 'admin';
     const today = new Date().toISOString().slice(0,10);
 
-    // Fetch data sesuai role
-    const fetches = [call('getSantri'), call('getSantri', { binaan_only: !isAdmin })];
+    // Fetch data sesuai role - tambahkan getKelas untuk kolom kelas siswa
+    const fetches = [call('getSantri'), call('getSantri', { binaan_only: !isAdmin }), call('getKelas')];
     if (isAdmin) fetches.push(call('getUsers'));
-    const [allSantriRes, binaanRes, usersRes] = await Promise.all(fetches);
+    const [allSantriRes, binaanRes, kelasRes, usersRes] = await Promise.all(fetches);
 
     state.cache.santri = allSantriRes.ok ? allSantriRes.data : [];
-    // Untuk presensi: penyimak langsung pakai binaan, admin bisa pilih penyimak
+    state.cache.kelas  = kelasRes.ok ? kelasRes.data : [];
     state.cache.santriPresensi = binaanRes.ok ? binaanRes.data : [];
 
     const penyimakList = isAdmin && usersRes && usersRes.ok
