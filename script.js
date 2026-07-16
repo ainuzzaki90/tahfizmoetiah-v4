@@ -95,14 +95,15 @@ const TF = (() => {
 
   function menuFor(role) {
     const all = [
-      { key: 'dashboard', label: 'Dashboard', roles: ['admin','penyimak','santri'] },
-      { key: 'setoran', label: 'Setoran', roles: ['admin','penyimak','santri'] },
-      { key: 'santri', label: 'Data Siswa', roles: ['admin','penyimak'] },
-      { key: 'kelas', label: 'Data Kelas', roles: ['admin'] },
-      { key: 'statistik', label: 'Statistik', roles: ['admin','penyimak','santri'] },
-      { key: 'rekap', label: 'Rekap & Rapor', roles: ['admin','penyimak'] },
-      { key: 'mushaf', label: 'Mushaf Digital', roles: ['admin','penyimak','santri'] },
-      { key: 'users', label: 'Pengguna', roles: ['admin'] }
+      { key: 'dashboard', label: 'Dashboard',       roles: ['admin','penyimak','santri'] },
+      { key: 'setoran',   label: 'Setoran',          roles: ['admin','penyimak'] },
+      { key: 'presensi',  label: 'Presensi',         roles: ['admin','penyimak'] },
+      { key: 'santri',    label: 'Data Siswa',       roles: ['admin','penyimak'] },
+      { key: 'kelas',     label: 'Data Kelas',       roles: ['admin'] },
+      { key: 'statistik', label: 'Statistik',        roles: ['admin','penyimak','santri'] },
+      { key: 'rekap',     label: 'Rekap & Rapor',    roles: ['admin','penyimak'] },
+      { key: 'mushaf',    label: 'Mushaf Digital',   roles: ['admin','penyimak','santri'] },
+      { key: 'users',     label: 'Pengguna',         roles: ['admin'] }
     ];
     return all.filter(m => m.roles.includes(role));
   }
@@ -164,7 +165,7 @@ const TF = (() => {
 
     // ── Tampilkan dari cache jika tersedia (hindari loading tiap pindah menu) ──
     // Cache di-invalidate setelah tambah/edit/hapus data (lihat fungsi invalidateCache)
-    const CACHEABLE = ['setoran','santri','kelas','statistik','users'];
+    const CACHEABLE = ['setoran','santri','kelas','statistik','users','presensi'];
     const hasCache = CACHEABLE.includes(state.view) && state.pageCache[state.view];
     if (hasCache) {
       content.innerHTML = state.pageCache[state.view];
@@ -180,8 +181,9 @@ const TF = (() => {
 
     // ── Baru load konten (async — bisa lambat karena API Apps Script) ──
     if (state.view === 'dashboard') await renderDashboard(content);
-    else if (state.view === 'setoran') await renderSetoran(content);
-    else if (state.view === 'santri') await renderSantri(content);
+    else if (state.view === 'setoran')   await renderSetoran(content);
+    else if (state.view === 'presensi')  await renderPresensi(content);
+    else if (state.view === 'santri')    await renderSantri(content);
     else if (state.view === 'kelas') await renderKelas(content);
     else if (state.view === 'statistik') await renderStatistik(content);
     else if (state.view === 'rekap') await renderRekap(content);
@@ -514,13 +516,25 @@ const TF = (() => {
 
   // ---------- DATA SISWA ----------
   async function renderSantri(content) {
-    const [santriRes, kelasRes] = await Promise.all([call('getSantri'), call('getKelas')]);
+    const [santriRes, kelasRes, binaanRes, usersRes] = await Promise.all([
+      call('getSantri'), call('getKelas'), call('getPenyimakSantri', {}), call('getUsers')
+    ]);
     if (!santriRes.ok) { content.innerHTML = '<p class="tf-error">' + santriRes.error + '</p>'; return; }
     state.cache.kelas = kelasRes.ok ? kelasRes.data : [];
+    state.cache.users = usersRes.ok ? usersRes.data : [];
     const kelasMapNama = {};
     state.cache.kelas.forEach(k => { kelasMapNama[k.id] = k.nama_kelas; });
+    const userMap = {};
+    state.cache.users.forEach(u => { userMap[u.id] = u.nama; });
+    const santriPenyimakMap = {};
+    if (binaanRes.ok) {
+      binaanRes.data.forEach(b => {
+        santriPenyimakMap[String(b.santri_id)] = userMap[b.penyimak_id] || '-';
+      });
+    }
     const dataWithKelasNama = santriRes.data.map(s => Object.assign({}, s, {
-      kelas_nama: kelasMapNama[s.kelas_id] || '(belum ada kelas)'
+      kelas_nama: kelasMapNama[s.kelas_id] || '(belum ada kelas)',
+      guru_pengampu: santriPenyimakMap[String(s.id)] || '-'
     }));
     state.cache.santriList = dataWithKelasNama;
     content.innerHTML = `
@@ -770,6 +784,275 @@ const TF = (() => {
     const res = await call('addKelas', { nama_kelas: val('m-nama-kelas'), penyimak_id: val('m-penyimak-id') });
     if (!res.ok) { alert(res.error); return; }
     invalidateCache('kelas','santri'); closeModal(); render();
+  }
+
+  // ---------- PRESENSI ----------
+  async function renderPresensi(content) {
+    const [kelasRes, santriRes] = await Promise.all([call('getKelas'), call('getSantri')]);
+    state.cache.kelas  = kelasRes.ok  ? kelasRes.data  : [];
+    state.cache.santri = santriRes.ok ? santriRes.data : [];
+
+    const kelasOptions = '<option value="">-- Pilih Kelas --</option>' +
+      state.cache.kelas.map(k => `<option value="${k.id}">${escapeHtml(k.nama_kelas)}</option>`).join('');
+
+    const today = new Date().toISOString().slice(0,10);
+
+    content.innerHTML = `
+      <h1 class="tf-title">Presensi</h1>
+
+      <!-- Form Input Presensi -->
+      <div class="tf-panel">
+        <div class="tf-panel-head">Input Presensi Kelas</div>
+        <div class="tf-panel-body">
+          <div class="tf-grid2">
+            <div class="tf-field">
+              <label>Tanggal</label>
+              <input type="date" id="ps-tanggal" value="${today}">
+            </div>
+            <div class="tf-field">
+              <label>Kelas</label>
+              <select id="ps-kelas" onchange="TF.loadPresensiSiswa()">${kelasOptions}</select>
+            </div>
+          </div>
+          <div class="tf-field">
+            <label>Materi yang Diajarkan</label>
+            <input type="text" id="ps-materi" placeholder="contoh: Jilid 2 hal. 10-12, Surat Al-Mulk">
+          </div>
+          <div class="tf-field">
+            <label>Catatan / Keterangan</label>
+            <textarea id="ps-catatan" rows="2" placeholder="catatan kondisi kelas, kejadian khusus, dll."></textarea>
+          </div>
+          <div id="ps-siswa-table"><div class="tf-empty">Pilih kelas untuk menampilkan daftar siswa.</div></div>
+          <div id="ps-save-area" style="display:none;margin-top:12px;">
+            <button class="tf-btn" onclick="TF.submitPresensi()">💾 Simpan Presensi</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Riwayat Presensi -->
+      <div class="tf-panel">
+        <div class="tf-panel-head">Riwayat Presensi
+          <div style="display:flex;gap:8px;align-items:center;margin-left:auto;">
+            <select id="ps-filter-kelas" onchange="TF.loadRiwayatPresensi()" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+              <option value="">Semua Kelas</option>
+              ${state.cache.kelas.map(k => `<option value="${k.id}">${escapeHtml(k.nama_kelas)}</option>`).join('')}
+            </select>
+            <input type="date" id="ps-filter-mulai" onchange="TF.loadRiwayatPresensi()" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+            <input type="date" id="ps-filter-akhir" onchange="TF.loadRiwayatPresensi()" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+          </div>
+        </div>
+        <div class="tf-panel-body tf-table-wrap" id="ps-riwayat">
+          <div class="tf-empty">Memuat riwayat...</div>
+        </div>
+      </div>
+
+      <!-- Rekap Kehadiran -->
+      <div class="tf-panel">
+        <div class="tf-panel-head">Rekap Kehadiran Per Siswa
+          <div style="display:flex;gap:8px;align-items:center;margin-left:auto;">
+            <select id="ps-rekap-kelas" onchange="TF.loadRekapPresensi()" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+              <option value="">Semua Kelas</option>
+              ${state.cache.kelas.map(k => `<option value="${k.id}">${escapeHtml(k.nama_kelas)}</option>`).join('')}
+            </select>
+            <input type="date" id="ps-rekap-mulai" onchange="TF.loadRekapPresensi()" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+            <input type="date" id="ps-rekap-akhir" onchange="TF.loadRekapPresensi()" style="padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+          </div>
+        </div>
+        <div class="tf-panel-body tf-table-wrap" id="ps-rekap-tabel">
+          <div class="tf-empty">Pilih rentang tanggal untuk melihat rekap kehadiran.</div>
+        </div>
+      </div>
+    `;
+    loadRiwayatPresensi();
+  }
+
+  function loadPresensiSiswa() {
+    const kelasId = val('ps-kelas');
+    if (!kelasId) return;
+    const siswa = (state.cache.santri || []).filter(s => String(s.kelas_id) === String(kelasId));
+    const el = document.getElementById('ps-siswa-table');
+    const saveArea = document.getElementById('ps-save-area');
+    if (!siswa.length) {
+      el.innerHTML = '<div class="tf-empty">Tidak ada siswa di kelas ini.</div>';
+      saveArea.style.display = 'none';
+      return;
+    }
+    el.innerHTML = `
+      <div style="margin:10px 0 6px;display:flex;gap:8px;align-items:center;">
+        <strong>Daftar Siswa (${siswa.length} orang)</strong>
+        <button class="tf-btn-sm" onclick="TF.setAllPresensi('Hadir')">✅ Semua Hadir</button>
+        <button class="tf-btn-sm" onclick="TF.setAllPresensi('Alfa')">❌ Semua Alfa</button>
+      </div>
+      <table class="tf-table">
+        <thead><tr><th>#</th><th>Nama Siswa</th><th>Status Kehadiran</th></tr></thead>
+        <tbody>
+          ${siswa.map((s, i) => `<tr>
+            <td style="text-align:center;color:#9ca3af;font-size:12px;">${i+1}</td>
+            <td>${escapeHtml(s.nama)}</td>
+            <td>
+              <div class="tf-presensi-radio" data-santri="${s.id}">
+                ${['Hadir','Izin','Sakit','Alfa'].map(st =>
+                  `<label class="tf-ps-label tf-ps-${st.toLowerCase()}">
+                    <input type="radio" name="ps-${s.id}" value="${st}" ${st==='Hadir'?'checked':''}>
+                    ${st}
+                  </label>`
+                ).join('')}
+              </div>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+    saveArea.style.display = 'block';
+  }
+
+  function setAllPresensi(status) {
+    document.querySelectorAll('input[type="radio"]').forEach(r => {
+      if (r.value === status) r.checked = true;
+    });
+  }
+
+  async function submitPresensi() {
+    const tanggal  = val('ps-tanggal');
+    const kelas_id = val('ps-kelas');
+    const materi   = val('ps-materi');
+    const catatan  = val('ps-catatan');
+    if (!tanggal || !kelas_id) { alert('Pilih tanggal dan kelas terlebih dahulu.'); return; }
+
+    const siswa = (state.cache.santri || []).filter(s => String(s.kelas_id) === String(kelas_id));
+    const rows = siswa.map(s => {
+      const checked = document.querySelector(`input[name="ps-${s.id}"]:checked`);
+      return { santri_id: s.id, status: checked ? checked.value : 'Hadir' };
+    });
+
+    const btn = document.querySelector('#ps-save-area .tf-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+
+    const res = await call('savePresensi', { tanggal, kelas_id, materi, catatan, rows });
+    if (!res.ok) { alert(res.error); if (btn) { btn.disabled=false; btn.textContent='💾 Simpan Presensi'; } return; }
+
+    invalidateCache('presensi');
+    alert('Presensi berhasil disimpan!');
+    loadRiwayatPresensi();
+    if (btn) { btn.disabled=false; btn.textContent='💾 Simpan Presensi'; }
+  }
+
+  async function loadRiwayatPresensi() {
+    const el = document.getElementById('ps-riwayat');
+    if (!el) return;
+    el.innerHTML = '<div class="tf-empty">Memuat...</div>';
+    const payload = {};
+    const fKelas = val('ps-filter-kelas');
+    const fMulai = val('ps-filter-mulai');
+    const fAkhir = val('ps-filter-akhir');
+    if (fKelas) payload.kelas_id = fKelas;
+    if (fMulai) payload.tanggal_mulai = fMulai;
+    if (fAkhir) payload.tanggal_akhir = fAkhir;
+
+    const res = await call('getPresensi', payload);
+    if (!res.ok) { el.innerHTML = '<p class="tf-error">' + res.error + '</p>'; return; }
+
+    // Group by tanggal + kelas
+    const kelasMap = {};
+    (state.cache.kelas || []).forEach(k => { kelasMap[k.id] = k.nama_kelas; });
+    const santriMap = {};
+    (state.cache.santri || []).forEach(s => { santriMap[s.id] = s.nama; });
+    const groups = {};
+    res.data.forEach(r => {
+      const key = r.tanggal + '|' + r.kelas_id;
+      if (!groups[key]) groups[key] = { tanggal: r.tanggal, kelas_id: r.kelas_id, materi: r.materi, catatan: r.catatan, rows: [] };
+      groups[key].rows.push(r);
+    });
+
+    const groupArr = Object.values(groups).sort((a,b) => b.tanggal.localeCompare(a.tanggal));
+    if (!groupArr.length) { el.innerHTML = '<div class="tf-empty">Belum ada data presensi.</div>'; return; }
+
+    el.innerHTML = groupArr.map((g, gi) => {
+      const hadir  = g.rows.filter(r => r.status === 'Hadir').length;
+      const izin   = g.rows.filter(r => r.status === 'Izin').length;
+      const sakit  = g.rows.filter(r => r.status === 'Sakit').length;
+      const alfa   = g.rows.filter(r => r.status === 'Alfa').length;
+      return `<div class="tf-presensi-group">
+        <div class="tf-presensi-group-head" onclick="TF.togglePresensiGroup('pg-${gi}')">
+          <span>📅 ${g.tanggal} — <b>${escapeHtml(kelasMap[g.kelas_id]||'-')}</b></span>
+          <span class="tf-ps-summary">
+            <span class="tf-ps-chip tf-ps-hadir">H:${hadir}</span>
+            <span class="tf-ps-chip tf-ps-izin">I:${izin}</span>
+            <span class="tf-ps-chip tf-ps-sakit">S:${sakit}</span>
+            <span class="tf-ps-chip tf-ps-alfa">A:${alfa}</span>
+            <button class="tf-btn-icon tf-btn-icon-del" onclick="event.stopPropagation();TF.hapusPresensi('${g.tanggal}','${g.kelas_id}')" title="Hapus">🗑</button>
+            <span class="tf-ps-toggle">▾</span>
+          </span>
+        </div>
+        <div class="tf-presensi-group-body" id="pg-${gi}" style="display:none;">
+          ${g.materi ? `<p style="margin:4px 8px;font-size:13px;">📖 Materi: <b>${escapeHtml(g.materi)}</b></p>` : ''}
+          ${g.catatan ? `<p style="margin:4px 8px;font-size:13px;">📝 Catatan: ${escapeHtml(g.catatan)}</p>` : ''}
+          <table class="tf-table" style="margin-top:6px;">
+            <thead><tr><th>#</th><th>Nama Siswa</th><th>Status</th></tr></thead>
+            <tbody>
+              ${g.rows.map((r,i) => `<tr>
+                <td style="text-align:center;color:#9ca3af;font-size:12px;">${i+1}</td>
+                <td>${escapeHtml(santriMap[r.santri_id]||'-')}</td>
+                <td><span class="tf-ps-badge tf-ps-${(r.status||'hadir').toLowerCase()}">${r.status||'Hadir'}</span></td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function togglePresensiGroup(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  }
+
+  async function hapusPresensi(tanggal, kelas_id) {
+    if (!confirm(`Hapus data presensi tanggal ${tanggal}?`)) return;
+    const res = await call('deletePresensi', { tanggal, kelas_id });
+    if (!res.ok) { alert(res.error); return; }
+    invalidateCache('presensi'); loadRiwayatPresensi();
+  }
+
+  async function loadRekapPresensi() {
+    const el = document.getElementById('ps-rekap-tabel');
+    if (!el) return;
+    const payload = { show_all: false };
+    const fKelas = val('ps-rekap-kelas');
+    const fMulai = val('ps-rekap-mulai');
+    const fAkhir = val('ps-rekap-akhir');
+    if (fKelas) payload.kelas_id = fKelas;
+    if (fMulai) payload.tanggal_mulai = fMulai;
+    if (fAkhir) payload.tanggal_akhir = fAkhir;
+    if (!fMulai && !fAkhir) { el.innerHTML = '<div class="tf-empty">Pilih rentang tanggal untuk melihat rekap kehadiran.</div>'; return; }
+    el.innerHTML = '<div class="tf-empty">Memuat...</div>';
+    const res = await call('getRekapPresensi', payload);
+    if (!res.ok) { el.innerHTML = '<p class="tf-error">' + res.error + '</p>'; return; }
+    if (!res.data.length) { el.innerHTML = '<div class="tf-empty">Tidak ada data kehadiran pada periode ini.</div>'; return; }
+    el.innerHTML = `<table class="tf-table"><thead><tr>
+      <th>#</th><th>Nama</th><th>Kelas</th><th>Level Ummi</th>
+      <th style="text-align:center;color:#16a34a;">H</th>
+      <th style="text-align:center;color:#d97706;">I</th>
+      <th style="text-align:center;color:#2563eb;">S</th>
+      <th style="text-align:center;color:#dc2626;">A</th>
+      <th style="text-align:center;">Total</th>
+      <th style="text-align:center;">% Hadir</th>
+    </tr></thead><tbody>
+    ${res.data.map((r,i) => `<tr>
+      <td style="text-align:center;color:#9ca3af;font-size:12px;">${i+1}</td>
+      <td>${escapeHtml(r.nama)}</td>
+      <td>${escapeHtml(r.kelas_nama)}</td>
+      <td>${escapeHtml(r.level_ummi)}</td>
+      <td style="text-align:center;font-weight:700;color:#16a34a;">${r.hadir}</td>
+      <td style="text-align:center;color:#d97706;">${r.izin}</td>
+      <td style="text-align:center;color:#2563eb;">${r.sakit}</td>
+      <td style="text-align:center;color:#dc2626;">${r.alfa}</td>
+      <td style="text-align:center;">${r.total}</td>
+      <td style="text-align:center;">
+        <span style="color:${r.pct_hadir>=75?'#16a34a':'#dc2626'};font-weight:700;">${r.pct_hadir}%</span>
+      </td>
+    </tr>`).join('')}
+    </tbody></table>`;
   }
 
   // ---------- STATISTIK ----------
@@ -1590,6 +1873,7 @@ const TF = (() => {
         ${thSort('santri','kelas_nama','Kelas')}
         ${thSort('santri','level_ummi','Level Ummi')}
         ${thSort('santri','jenis_kelamin','Jenis Kelamin')}
+        ${thSort('santri','guru_pengampu','Guru Pengampu')}
         <th>Aksi</th></tr></thead><tbody>
         ${data.map((s, i) => `<tr>
           <td style="text-align:center;color:#9ca3af;font-size:12px;">${i+1}</td>
@@ -1598,6 +1882,7 @@ const TF = (() => {
           <td>${escapeHtml(s.kelas_nama)}</td>
           <td>${escapeHtml(s.level_ummi||'-')}</td>
           <td>${escapeHtml(s.jenis_kelamin||'-')}</td>
+          <td>${escapeHtml(s.guru_pengampu||'-')}</td>
           <td style="white-space:nowrap;">
             <button class="tf-btn-icon" title="Edit" onclick="TF.openEditSantriModal('${s.id}')">✏️</button>
             <button class="tf-btn-icon tf-btn-icon-del" title="Hapus" onclick="TF.deleteSantri('${s.id}','${escapeHtml(s.nama)}')">🗑</button>
@@ -1752,7 +2037,8 @@ const TF = (() => {
   }
 
   return {
-    login, logout, setView, render, init, toggleSidebar, closeSidebar,
+    loadPresensiSiswa, setAllPresensi, submitPresensi,
+    loadRiwayatPresensi, togglePresensiGroup, hapusPresensi, loadRekapPresensi,
     openEditSantriModal, submitEditSantri, deleteSantri,
     openEditKelasModal, submitEditKelas, deleteKelas,
     openEditUserModal, submitEditUser, deleteUser,
