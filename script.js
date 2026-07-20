@@ -204,11 +204,16 @@ const TF = (() => {
 
   // ---------- DASHBOARD ----------
   async function renderDashboard(content) {
-    const [res, santriRes] = await Promise.all([call('getDashboard'), call('getSantri')]);
+    const [res, santriRes, kelasRes] = await Promise.all([
+      call('getDashboard'), call('getSantri'), call('getKelas')
+    ]);
     if (!res.ok) { content.innerHTML = '<p class="tf-error">' + res.error + '</p>'; return; }
-    const santriMap = {};
     state.cache.santri = santriRes.ok ? santriRes.data : [];
+    state.cache.kelas  = kelasRes.ok  ? kelasRes.data  : [];
+    const santriMap = {};
     state.cache.santri.forEach(s => { santriMap[s.id] = s.nama; });
+    const kelasMap = {};
+    state.cache.kelas.forEach(k => { kelasMap[k.id] = k.nama_kelas; });
     // Preload santriSetoran untuk dropdown modal setoran
     if (!state.cache.santriSetoran) {
       if (state.user.role === 'penyimak') {
@@ -238,9 +243,12 @@ const TF = (() => {
       ? listToTable(res.setoran_terbaru.map((r, i) => Object.assign({}, r, {
           no: i + 1,
           nama_santri: santriMap[r.santri_id] || '(siswa terhapus)',
+          kelas_nama:  kelasMap[r.kelas_id]  || '-',
           lokasi: formatLokasiSetoran(r)
         })), [
-          ['no','#'],['nama_santri','Nama Siswa'],['tanggal','Tanggal'],['lokasi','Surah/Halaman'],['jenis','Jenis'],['nilai','Nilai'],['predikat','Predikat']
+          ['no','#'],['nama_santri','Nama Siswa'],['kelas_nama','Kelas'],
+          ['tanggal','Tanggal'],['lokasi','Surah/Halaman'],['jenis','Jenis'],
+          ['nilai','Nilai'],['predikat','Predikat']
         ])
       : '<div class="tf-empty">Belum ada setoran tercatat.</div>';
   }
@@ -261,25 +269,26 @@ const TF = (() => {
   // ---------- SETORAN ----------
   async function renderSetoran(content) {
     const isPenyimak = state.user.role === 'penyimak';
-    const [setoranRes, santriRes, santriSetoranRes] = await Promise.all([
+    const [setoranRes, santriRes, kelasRes, santriSetoranRes] = await Promise.all([
       call('getSetoran'),
-      call('getSantri'),                                    // semua siswa (untuk nama di tabel)
-      isPenyimak ? call('getSantri', { binaan_only: true }) // penyimak: hanya binaan untuk dropdown
+      call('getSantri'),
+      call('getKelas'),
+      isPenyimak ? call('getSantri', { binaan_only: true })
                  : Promise.resolve({ ok: true, data: null })
     ]);
     if (!setoranRes.ok) { content.innerHTML = '<p class="tf-error">' + setoranRes.error + '</p>'; return; }
     state.cache.santri = santriRes.ok ? santriRes.data : [];
-    // Dropdown setoran: penyimak→binaan saja, admin→semua
+    state.cache.kelas  = kelasRes.ok  ? kelasRes.data  : [];
     state.cache.santriSetoran = isPenyimak
       ? (santriSetoranRes.ok && santriSetoranRes.data ? santriSetoranRes.data : [])
       : state.cache.santri;
     const santriMap = {};
     state.cache.santri.forEach(s => { santriMap[s.id] = s.nama; });
     const kelasMap = {};
-    (state.cache.kelas || []).forEach(k => { kelasMap[k.id] = k.nama_kelas; });
+    state.cache.kelas.forEach(k => { kelasMap[k.id] = k.nama_kelas; });
     state.cache.setoranList = setoranRes.data.map(r => Object.assign({}, r, {
       santri_nama: santriMap[r.santri_id] || '(siswa terhapus)',
-      kelas_nama: kelasMap[r.kelas_id] || '-',
+      kelas_nama:  kelasMap[r.kelas_id]  || '-',
       tanggal_fmt: r.tanggal ? r.tanggal.substring(0,10) : '-',
       lokasi: formatLokasiSetoran(r)
     }));
@@ -511,7 +520,86 @@ const TF = (() => {
     }
     const res = await call('addSetoranBulk', { list: items });
     if (!res.ok) { alert(res.error); return; }
-    closeModal(); render();
+    closeModal();
+    // Hapus cache setoran dan dashboard supaya data terbaru langsung tampil
+    invalidateCache('setoran', 'dashboard');
+    delete state.cache.setoranList;
+    // Langsung re-render halaman setoran atau dashboard
+    const contentEl = document.getElementById('tf-content');
+    contentEl.innerHTML = `<div class="tf-loading-wrap"><div class="tf-spinner"></div><p class="tf-loading-text">Memuat data terbaru...</p></div>`;
+    if (state.view === 'setoran') {
+      await renderSetoran(contentEl);
+      state.pageCache['setoran'] = contentEl.innerHTML;
+    } else {
+      await renderDashboard(contentEl);
+    }
+  }
+
+  // Helper refresh setoran setelah mutasi
+  async function refreshSetoran() {
+    invalidateCache('setoran', 'dashboard');
+    delete state.cache.setoranList;
+    const contentEl = document.getElementById('tf-content');
+    contentEl.innerHTML = `<div class="tf-loading-wrap"><div class="tf-spinner"></div><p class="tf-loading-text">Memuat data terbaru...</p></div>`;
+    await renderSetoran(contentEl);
+    state.pageCache['setoran'] = contentEl.innerHTML;
+  }
+
+  function openEditSetoranModal(id) {
+    const r = (state.cache.setoranList || []).find(x => String(x.id) === String(id));
+    if (!r) return;
+    const kelasOpts = (state.cache.kelas || []).map(k =>
+      `<option value="${k.id}" ${String(k.id)===String(r.kelas_id)?'selected':''}>${escapeHtml(k.nama_kelas)}</option>`).join('');
+    openModal(`
+      <h3>Edit Setoran</h3>
+      <div class="tf-grid2">
+        <div class="tf-field"><label>Nilai</label><input id="m-edit-nilai" type="number" min="0" max="100" value="${r.nilai||''}"></div>
+        <div class="tf-field"><label>Predikat</label>
+          <select id="m-edit-predikat">
+            ${['Mumtaz','Jayyid Jiddan','Jayyid','Maqbul','Dhoif'].map(p =>
+              `<option ${p===r.predikat?'selected':''}>${p}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="tf-field"><label>Jenis</label>
+        <select id="m-edit-jenis">
+          ${['Setoran Metode Ummi','Hafalan Baru','Murojaah','Tilawah'].map(j =>
+            `<option ${j===r.jenis?'selected':''}>${j}</option>`).join('')}
+        </select>
+      </div>
+      <div class="tf-grid2">
+        <div class="tf-field"><label>Halaman Mulai</label><input id="m-edit-hmulai" type="number" value="${r.halaman_mulai||''}"></div>
+        <div class="tf-field"><label>Halaman Akhir</label><input id="m-edit-hakhir" type="number" value="${r.halaman_akhir||''}"></div>
+      </div>
+      <div class="tf-field"><label>Catatan</label><input id="m-edit-catatan" type="text" value="${escapeHtml(r.catatan||'')}"></div>
+      <div class="tf-modal-actions">
+        <button class="tf-btn tf-btn-secondary" onclick="TF.closeModal()">Batal</button>
+        <button class="tf-btn" onclick="TF.submitEditSetoran('${id}')">Simpan</button>
+      </div>
+    `);
+  }
+
+  async function submitEditSetoran(id) {
+    const payload = {
+      id,
+      nilai:        val('m-edit-nilai'),
+      predikat:     val('m-edit-predikat'),
+      jenis:        val('m-edit-jenis'),
+      halaman_mulai: val('m-edit-hmulai'),
+      halaman_akhir: val('m-edit-hakhir'),
+      catatan:      val('m-edit-catatan'),
+    };
+    const res = await call('updateSetoran', payload);
+    if (!res.ok) { alert(res.error); return; }
+    closeModal();
+    await refreshSetoran();
+  }
+
+  async function deleteSetoran(id) {
+    if (!confirm('Hapus data setoran ini?')) return;
+    const res = await call('deleteSetoran', { id });
+    if (!res.ok) { alert(res.error); return; }
+    await refreshSetoran();
   }
 
   // ---------- DATA SISWA ----------
@@ -2212,6 +2300,7 @@ const TF = (() => {
     openChangePasswordModal, submitChangePassword,
     clickSort,
     openSetoranModal, submitSetoran, renderSetoranFields, renderJenisBlocks, onSurahChange,
+    openEditSetoranModal, submitEditSetoran, deleteSetoran,
     onUmmiGradeChange, toggleUmmiBlock,
     openSantriModal, submitSantri, downloadTemplateSiswa, uploadSiswa,
     openKelasModal, submitKelas,
