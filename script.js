@@ -211,7 +211,11 @@ const TF = (() => {
     state.cache.santri = santriRes.ok ? santriRes.data : [];
     state.cache.kelas  = kelasRes.ok  ? kelasRes.data  : [];
     const santriMap = {};
-    state.cache.santri.forEach(s => { santriMap[s.id] = s.nama; });
+    const santriLevelMap = {};
+    state.cache.santri.forEach(s => {
+      santriMap[s.id] = s.nama;
+      santriLevelMap[s.id] = s.level_ummi || '-';
+    });
     const kelasMap = {};
     state.cache.kelas.forEach(k => { kelasMap[k.id] = k.nama_kelas; });
     // Preload santriSetoran untuk dropdown modal setoran
@@ -242,12 +246,14 @@ const TF = (() => {
     document.getElementById('tf-dash-setoran').innerHTML = res.setoran_terbaru.length
       ? listToTable(res.setoran_terbaru.map((r, i) => Object.assign({}, r, {
           no: i + 1,
-          nama_santri: santriMap[r.santri_id] || '(siswa terhapus)',
-          kelas_nama:  kelasMap[r.kelas_id]  || '-',
+          nama_santri: santriMap[r.santri_id]      || '(siswa terhapus)',
+          kelas_nama:  kelasMap[r.kelas_id]        || '-',
+          level_ummi:  santriLevelMap[r.santri_id] || '-',
           lokasi: formatLokasiSetoran(r)
         })), [
           ['no','#'],['nama_santri','Nama Siswa'],['kelas_nama','Kelas'],
-          ['tanggal','Tanggal'],['lokasi','Surah/Halaman'],['jenis','Jenis'],
+          ['level_ummi','Level Ummi'],['tanggal','Tanggal'],
+          ['lokasi','Surah/Halaman'],['jenis','Jenis'],
           ['nilai','Nilai'],['predikat','Predikat']
         ])
       : '<div class="tf-empty">Belum ada setoran tercatat.</div>';
@@ -283,13 +289,18 @@ const TF = (() => {
       ? (santriSetoranRes.ok && santriSetoranRes.data ? santriSetoranRes.data : [])
       : state.cache.santri;
     const santriMap = {};
-    state.cache.santri.forEach(s => { santriMap[s.id] = s.nama; });
+    const santriLevelMap = {};
+    state.cache.santri.forEach(s => {
+      santriMap[s.id] = s.nama;
+      santriLevelMap[s.id] = s.level_ummi || '-';
+    });
     const kelasMap = {};
     state.cache.kelas.forEach(k => { kelasMap[k.id] = k.nama_kelas; });
     state.cache.setoranList = setoranRes.data.map(r => Object.assign({}, r, {
-      santri_nama: santriMap[r.santri_id] || '(siswa terhapus)',
-      kelas_nama:  kelasMap[r.kelas_id]  || '-',
-      tanggal_fmt: r.tanggal ? r.tanggal.substring(0,10) : '-',
+      santri_nama:  santriMap[r.santri_id]      || '(siswa terhapus)',
+      kelas_nama:   kelasMap[r.kelas_id]        || '-',
+      level_ummi:   santriLevelMap[r.santri_id] || '-',
+      tanggal_fmt:  r.tanggal ? r.tanggal.substring(0,10) : '-',
       lokasi: formatLokasiSetoran(r)
     }));
     const canAdd = state.user.role === 'admin' || state.user.role === 'penyimak';
@@ -1146,34 +1157,43 @@ const TF = (() => {
     const catatan = val('ps-catatan');
     if (!tanggal) { alert('Pilih tanggal terlebih dahulu.'); return; }
 
-    // Tentukan penyimak_id dan siswa yang akan disimpan
     const isAdmin = state.user.role === 'admin';
-    let penyimak_id = state.user.id || state.user.user_id;
-    let siswa = state.cache.santriPresensi || [];
+    // Penyimak: gunakan id dari session; Admin: ambil dari dropdown pilihan guru
+    const penyimak_id = isAdmin ? val('ps-penyimak') : (state.user.id || state.user.user_id || '');
+    let siswa = [];
 
     if (isAdmin) {
-      penyimak_id = val('ps-penyimak');
       if (!penyimak_id) { alert('Pilih guru terlebih dahulu.'); return; }
       siswa = (state.cache.santriPresensiAdmin || {})[penyimak_id] || [];
+    } else {
+      siswa = state.cache.santriPresensi || [];
     }
 
     if (!siswa.length) { alert('Tidak ada siswa binaan yang ditampilkan.'); return; }
 
     const rows = siswa.map(s => {
       const checked = document.querySelector(`input[name="ps-${s.id}"]:checked`);
-      return { santri_id: s.id, kelas_id: s.kelas_id || '', status: checked ? checked.value : 'Hadir' };
+      return {
+        santri_id: s.id,
+        kelas_id:  s.kelas_id || '',
+        status:    checked ? checked.value : 'Hadir'
+      };
     });
 
     const btn = document.querySelector('#ps-save-area .tf-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
 
     const res = await call('savePresensi', { tanggal, penyimak_id, materi, catatan, rows });
-    if (!res.ok) { alert(res.error); if (btn) { btn.disabled=false; btn.textContent='💾 Simpan Presensi'; } return; }
+    if (!res.ok) {
+      alert('Gagal menyimpan: ' + res.error);
+      if (btn) { btn.disabled = false; btn.textContent = '💾 Simpan Presensi'; }
+      return;
+    }
 
     invalidateCache('presensi');
     alert('Presensi berhasil disimpan!');
+    if (btn) { btn.disabled = false; btn.textContent = '💾 Simpan Presensi'; }
     loadRiwayatPresensi();
-    if (btn) { btn.disabled=false; btn.textContent='💾 Simpan Presensi'; }
   }
 
   async function loadRiwayatPresensi() {
@@ -2191,6 +2211,7 @@ const TF = (() => {
         ${thSort('setoran','tanggal','Tanggal')}
         ${thSort('setoran','santri_nama','Nama Siswa')}
         ${thSort('setoran','kelas_nama','Kelas')}
+        ${thSort('setoran','level_ummi','Level Ummi')}
         ${thSort('setoran','jenis','Jenis')}
         ${thSort('setoran','nilai','Nilai')}
         ${thSort('setoran','predikat','Predikat')}
@@ -2200,6 +2221,7 @@ const TF = (() => {
           <td>${escapeHtml(r.tanggal_fmt||r.tanggal||'-')}</td>
           <td>${escapeHtml(r.santri_nama||'-')}</td>
           <td>${escapeHtml(r.kelas_nama||'-')}</td>
+          <td>${escapeHtml(r.level_ummi||'-')}</td>
           <td><span class="tf-badge ${r.jenis==='Murojaah'?'b-murajaah':r.jenis==='Tilawah'?'b-tilawah':r.jenis==='Setoran Metode Ummi'?'b-ummi':'b-hafalan'}">${escapeHtml(r.jenis||'-')}</span></td>
           <td style="text-align:center;">${escapeHtml(String(r.nilai||'-'))}</td>
           <td>${escapeHtml(r.predikat||'-')}</td>
