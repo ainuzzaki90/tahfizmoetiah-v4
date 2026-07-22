@@ -699,14 +699,14 @@ const TF = (() => {
       jenis_kelamin: val('m-jk'), level_ummi: val('m-level-ummi') };
     const res = await call('updateSantri', payload);
     if (!res.ok) { alert(res.error); return; }
-    invalidateCache('santri','setoran','dashboard'); closeModal(); render();
+    invalidateCache('santri','setoran','dashboard'); closeModal(); await render();
   }
 
   async function deleteSantri(id, nama) {
     if (!confirm(`Hapus siswa "${nama}"? Data setoran terkait tidak ikut terhapus.`)) return;
     const res = await call('deleteSantri', { id });
     if (!res.ok) { alert(res.error); return; }
-    invalidateCache('santri','setoran','dashboard'); render();
+    invalidateCache('santri','setoran','dashboard'); await render();
   }
 
   function openSantriModal() {
@@ -735,7 +735,7 @@ const TF = (() => {
       jenis_kelamin: val('m-jk'), level_ummi: val('m-level-ummi') };
     const res = await call('addSantri', payload);
     if (!res.ok) { alert(res.error); return; }
-    invalidateCache('santri','setoran','dashboard'); closeModal(); render();
+    invalidateCache('santri','setoran','dashboard'); closeModal(); await render();
   }
 
   function downloadTemplateSiswa() {
@@ -930,14 +930,14 @@ const TF = (() => {
   async function submitEditKelas(id) {
     const res = await call('updateKelas', { id, nama_kelas: val('m-nama-kelas'), penyimak_id: val('m-penyimak-id') });
     if (!res.ok) { alert(res.error); return; }
-    invalidateCache('kelas','santri','setoran'); closeModal(); render();
+    invalidateCache('kelas','santri','setoran'); closeModal(); await render();
   }
 
   async function deleteKelas(id, nama) {
     if (!confirm(`Hapus kelas "${nama}"? Siswa yang terhubung ke kelas ini tidak ikut terhapus.`)) return;
     const res = await call('deleteKelas', { id });
     if (!res.ok) { alert(res.error); return; }
-    invalidateCache('kelas','santri'); render();
+    invalidateCache('kelas','santri'); await render();
   }
 
   function openKelasModal() {
@@ -964,7 +964,7 @@ const TF = (() => {
   async function submitKelas() {
     const res = await call('addKelas', { nama_kelas: val('m-nama-kelas'), penyimak_id: val('m-penyimak-id') });
     if (!res.ok) { alert(res.error); return; }
-    invalidateCache('kelas','santri'); closeModal(); render();
+    invalidateCache('kelas','santri'); closeModal(); await render();
   }
 
   // ---------- PRESENSI ----------
@@ -1947,7 +1947,7 @@ const TF = (() => {
       role: val('m-u-role'), kelas_id: val('m-u-kelas'), status: val('m-u-status') };
     const res = await call('updateUser', payload);
     if (!res.ok) { alert(res.error); return; }
-    invalidateCache('users'); closeModal(); render();
+    invalidateCache('users'); closeModal(); await render();
   }
 
   function openChangePasswordModal(id, nama) {
@@ -1966,17 +1966,19 @@ const TF = (() => {
 
   async function submitChangePassword(id) {
     const pwd = val('m-new-password');
-    if (!pwd) { alert('Password tidak boleh kosong'); return; }
+    if (!pwd || pwd.length < 4) { alert('Password minimal 4 karakter'); return; }
     const res = await call('changePassword', { id, password: pwd });
     if (!res.ok) { alert(res.error); return; }
-    closeModal(); alert('Password berhasil diubah.');
+    closeModal();
+    alert('Password berhasil diubah.');
+    // Tidak perlu re-render — perubahan password tidak mempengaruhi tampilan tabel
   }
 
   async function deleteUser(id, nama) {
     if (!confirm(`Hapus pengguna "${nama}"?`)) return;
     const res = await call('deleteUser', { id });
     if (!res.ok) { alert(res.error); return; }
-    invalidateCache('users'); render();
+    invalidateCache('users'); await render();
   }
 
   function openUserModal() {
@@ -2007,7 +2009,7 @@ const TF = (() => {
     const payload = { nama: val('m-u-nama'), username: val('m-u-username'), password: val('m-u-password'), role: val('m-u-role'), kelas_id: val('m-u-kelas') };
     const res = await call('addUser', payload);
     if (!res.ok) { alert(res.error); return; }
-    invalidateCache('users'); closeModal(); render();
+    invalidateCache('users'); closeModal(); await render();
   }
 
   // ---------- BINAAN PENYIMAK (siswa lintas kelas & level) ----------
@@ -2058,7 +2060,7 @@ const TF = (() => {
     const santriIds = Array.from(document.querySelectorAll('.tf-binaan-toggle:checked')).map(c => c.value);
     const res = await call('setPenyimakSantri', { penyimak_id: penyimakId, santri_ids: santriIds });
     if (!res.ok) { alert(res.error); return; }
-    invalidateCache('users','setoran'); delete state.cache.santriSetoran; closeModal(); render();
+    invalidateCache('users','setoran'); delete state.cache.santriSetoran; closeModal(); await render();
   }
 
   // ---------- utilities ----------
